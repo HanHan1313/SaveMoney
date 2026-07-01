@@ -467,6 +467,17 @@
     text-align: center;
     padding: 2px 0;
   }
+  .screenshot-thumb .shot-ocr {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    line-height: 1;
+  }
   .screenshot-thumb .shot-del {
     position: absolute;
     top: 4px; right: 4px;
@@ -581,6 +592,57 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     text-align: center;
+  }
+
+  /* ---- OCR candidate preview ---- */
+  .ocr-note {
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+  .ocr-candidate {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .ocr-candidate-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .ocr-candidate-header input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .ocr-candidate-header .ocr-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .ocr-candidate-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+  .ocr-candidate-fields input {
+    font-size: 13px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    text-align: center;
+    min-width: 0;
   }
 </style>
 </head>
@@ -793,6 +855,7 @@
       <input type="file" id="screenshotFile" accept="image/*" style="display:none">
       <button type="button" class="submit-btn btn-outline" id="screenshotUploadBtn">📷 上傳持股截圖</button>
       <div class="screenshot-grid" id="screenshotGrid"></div>
+      <div id="ocrPreview" style="margin-top:14px;"></div>
     </div>
   </div>
 
@@ -833,6 +896,7 @@
   <img id="lightboxImg" src="" alt="持股截圖">
 </div>
 
+<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (function () {
   const STORAGE_KEY = 'expenseTrackerRecords';
@@ -1915,9 +1979,14 @@
       thumb.innerHTML = `
         <img src="${s.dataUrl}" alt="持股截圖">
         <div class="shot-date">${s.date}</div>
+        <button type="button" class="shot-ocr" title="辨識並匯入持股">🔍</button>
         <button type="button" class="shot-del">×</button>
       `;
       thumb.querySelector('img').addEventListener('click', () => openLightbox(s.dataUrl));
+      thumb.querySelector('.shot-ocr').addEventListener('click', (e) => {
+        e.stopPropagation();
+        runOcrOnScreenshot(s.dataUrl, e.currentTarget);
+      });
       thumb.querySelector('.shot-del').addEventListener('click', (e) => {
         e.stopPropagation();
         if (!confirm('刪除這張截圖？')) return;
@@ -1927,6 +1996,126 @@
       });
       grid.appendChild(thumb);
     });
+  }
+
+  // ================= OCR: screenshot -> holdings =================
+  async function runOcrOnScreenshot(dataUrl, btn) {
+    if (typeof Tesseract === 'undefined') {
+      alert('OCR 元件載入失敗，請確認網路連線後重新整理頁面再試一次');
+      return;
+    }
+    const originalText = btn.textContent;
+    btn.textContent = '⏳';
+    btn.disabled = true;
+    el('ocrPreview').innerHTML = '<div class="empty-note">🔍 辨識中，請稍候…(第一次使用需下載辨識模型，可能需要一點時間)</div>';
+
+    try {
+      const { data: { text } } = await Tesseract.recognize(dataUrl, 'chi_tra+eng');
+      const rows = parseOcrToHoldings(text);
+      renderOcrPreview(rows);
+    } catch (err) {
+      el('ocrPreview').innerHTML = '<div class="empty-note">辨識失敗，請確認網路連線後再試一次</div>';
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  }
+
+  function parseOcrToHoldings(text) {
+    const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const rows = [];
+
+    lines.forEach(line => {
+      const numbers = (line.match(/-?\d[\d,]*\.?\d*/g) || [])
+        .map(s => parseFloat(s.replace(/,/g, '')))
+        .filter(n => !isNaN(n));
+
+      if (numbers.length === 0) return;
+
+      const nameCandidate = line
+        .replace(/-?\d[\d,]*\.?\d*/g, '')
+        .replace(/[|,:：\-+%()（）．.]/g, '')
+        .trim();
+
+      if (nameCandidate.length < 2) return;
+
+      rows.push({
+        name: nameCandidate,
+        shares: numbers[0] !== undefined ? numbers[0] : '',
+        costPrice: numbers[1] !== undefined ? numbers[1] : '',
+        currentPrice: numbers[2] !== undefined ? numbers[2] : (numbers[1] !== undefined ? numbers[1] : ''),
+        confident: numbers.length >= 2
+      });
+    });
+
+    return rows;
+  }
+
+  function renderOcrPreview(rows) {
+    const wrap = el('ocrPreview');
+    wrap.innerHTML = '';
+
+    if (rows.length === 0) {
+      wrap.innerHTML = '<div class="empty-note">這張截圖沒有辨識出可用的持股資料，請直接手動新增</div>';
+      return;
+    }
+
+    const note = document.createElement('div');
+    note.className = 'ocr-note';
+    note.textContent = '以下為自動辨識結果，可能有誤判，請確認或修改每一筆的名稱/股數/價格後再匯入(未勾選的項目不會匯入)';
+    wrap.appendChild(note);
+
+    rows.forEach(row => {
+      const card = document.createElement('div');
+      card.className = 'ocr-candidate';
+      card.innerHTML = `
+        <div class="ocr-candidate-header">
+          <input type="checkbox" class="ocr-check" ${row.confident ? 'checked' : ''}>
+          <input type="text" class="ocr-name" value="${escapeHtml(row.name)}" placeholder="股票名稱/代號">
+        </div>
+        <div class="ocr-candidate-fields">
+          <input type="number" class="ocr-shares" value="${row.shares}" placeholder="股數" min="0" step="1">
+          <input type="number" class="ocr-cost" value="${row.costPrice}" placeholder="成本價" min="0" step="0.01">
+          <input type="number" class="ocr-price" value="${row.currentPrice}" placeholder="目前股價" min="0" step="0.01">
+        </div>
+      `;
+      wrap.appendChild(card);
+    });
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:10px;margin-top:4px;';
+    actions.innerHTML = `
+      <button type="button" class="submit-btn" id="ocrConfirmBtn" style="flex:1;">確認匯入已勾選項目</button>
+      <button type="button" class="submit-btn btn-outline" id="ocrCancelBtn" style="flex:1;">取消</button>
+    `;
+    wrap.appendChild(actions);
+
+    el('ocrConfirmBtn').addEventListener('click', confirmOcrImport);
+    el('ocrCancelBtn').addEventListener('click', () => { wrap.innerHTML = ''; });
+  }
+
+  function confirmOcrImport() {
+    const cards = document.querySelectorAll('#ocrPreview .ocr-candidate');
+    let count = 0;
+
+    cards.forEach(card => {
+      if (!card.querySelector('.ocr-check').checked) return;
+      const name = card.querySelector('.ocr-name').value.trim();
+      const shares = parseFloat(card.querySelector('.ocr-shares').value);
+      const cost = parseFloat(card.querySelector('.ocr-cost').value);
+      const price = parseFloat(card.querySelector('.ocr-price').value);
+      if (!name || !shares || shares <= 0 || isNaN(cost) || isNaN(price)) return;
+
+      investments.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        name, shares, costPrice: cost, currentPrice: price
+      });
+      count++;
+    });
+
+    saveInvestments();
+    el('ocrPreview').innerHTML = `<div class="empty-note">已成功匯入 ${count} 檔持股</div>`;
+    renderInvestments();
   }
 
   function openLightbox(src) {
