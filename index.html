@@ -1,0 +1,2112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>簡約記帳</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card-bg: #ffffff;
+    --text: #1c1c1e;
+    --sub-text: #8e8e93;
+    --border: #e5e5ea;
+    --income: #34c759;
+    --expense: #ff3b30;
+    --accent: #007aff;
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: 90px;
+  }
+
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  header {
+    text-align: center;
+    padding: 20px 0 8px;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  /* ---- Bottom Nav ---- */
+  .bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -1px 4px rgba(0,0,0,0.05);
+    z-index: 100;
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 0 8px;
+    border: none;
+    background: none;
+    font-size: 20px;
+    color: var(--sub-text);
+  }
+  .nav-btn span { font-size: 11px; }
+  .nav-btn.active { color: var(--accent); }
+
+  /* ---- Summary ---- */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+  }
+  .label {
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-bottom: 4px;
+  }
+  .value {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .value.income { color: var(--income); }
+  .value.expense { color: var(--expense); }
+  .value.balance { color: var(--accent); }
+  .month-label {
+    text-align: center;
+    font-size: 13px;
+    color: var(--sub-text);
+    margin-bottom: 10px;
+  }
+
+  /* ---- Form ---- */
+  .type-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 14px;
+  }
+  .type-toggle button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sub-text);
+    border-radius: 10px;
+    transition: background .15s, color .15s;
+  }
+  .type-toggle button.active { background: var(--accent); color: #fff; }
+  .type-toggle button.active[data-type="expense"] {
+    background: var(--expense);
+    color: #fff;
+  }
+  .type-toggle button.active[data-type="income"] {
+    background: var(--income);
+    color: #fff;
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: var(--sub-text);
+    margin-bottom: 6px;
+  }
+  .field input,
+  .field select {
+    width: 100%;
+    font-size: 17px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--text);
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .field input:focus,
+  .field select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .checkbox-label input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px 8px;
+  }
+  .cat-item { position: relative; }
+  .category-btn {
+    width: 100%;
+    padding: 10px 4px;
+    font-size: 13px;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .category-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .category-btn.add-btn {
+    border-style: dashed;
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .cat-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--expense);
+    color: #fff;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    border: none;
+    padding: 0;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 14px;
+    margin-top: 4px;
+  }
+  .submit-btn:active { opacity: 0.8; }
+  .btn-outline {
+    background: var(--bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  /* ---- Chart ---- */
+  .chart-section h2, .history-section h2, .report-section h2, .investment-section h2, .import-section h2, .split-section h2 {
+    font-size: 16px;
+    margin: 0 0 14px;
+  }
+  .chart-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #pieCanvas {
+    width: 200px;
+    height: 200px;
+  }
+  .legend {
+    width: 100%;
+    margin-top: 16px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .legend-item:last-child { border-bottom: none; }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  .legend-name { flex: 1; }
+  .legend-percent { color: var(--sub-text); margin-right: 8px; }
+  .legend-amount { font-weight: 600; }
+  .empty-note {
+    text-align: center;
+    color: var(--sub-text);
+    font-size: 14px;
+    padding: 20px 0;
+  }
+
+  /* ---- History ---- */
+  .history-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+  .history-info { flex: 1; min-width: 0; }
+  .history-category { font-size: 15px; font-weight: 600; }
+  .history-note { font-size: 12px; color: var(--sub-text); margin-top: 1px; }
+  .history-date { font-size: 12px; color: var(--sub-text); }
+  .history-split-info { font-size: 11px; margin-top: 2px; }
+  .history-amount { font-size: 16px; font-weight: 700; margin-right: 10px; white-space: nowrap; }
+  .history-amount.income { color: var(--income); }
+  .history-amount.expense { color: var(--expense); }
+  .split-badge {
+    display: inline-block;
+    font-size: 10px;
+    background: rgba(0,122,255,0.12);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .delete-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg);
+    color: var(--sub-text);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .delete-btn:active { background: var(--border); }
+
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .filter-row select {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* ---- Report (P&L) ---- */
+  .month-row {
+    border-bottom: 1px solid var(--border);
+  }
+  .month-row:last-child { border-bottom: none; }
+  .month-row-header {
+    display: flex;
+    align-items: center;
+    padding: 14px 0;
+    width: 100%;
+    background: none;
+    border: none;
+    text-align: left;
+  }
+  .month-row-header .m-name { flex: 1; font-size: 15px; font-weight: 600; }
+  .month-row-header .m-col { width: 30%; text-align: right; font-size: 14px; }
+  .month-detail {
+    display: none;
+    padding: 4px 0 14px;
+  }
+  .month-detail.open { display: block; }
+  .detail-title { font-size: 12px; color: var(--sub-text); margin: 8px 0 4px; }
+  .detail-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+  }
+  .pl-header {
+    display: flex;
+    font-size: 12px;
+    color: var(--sub-text);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pl-header .m-name { flex: 1; }
+  .pl-header .m-col { width: 30%; text-align: right; }
+
+  /* ---- Investment ---- */
+  .inv-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+  }
+  .share-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-top: 12px;
+  }
+  .share-btn:active { opacity: 0.7; }
+  .holding-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .holding-item:last-child { border-bottom: none; }
+  .holding-top {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .holding-name { flex: 1; font-size: 15px; font-weight: 700; }
+  .holding-gain { font-size: 14px; font-weight: 700; }
+  .holding-gain.up { color: var(--income); }
+  .holding-gain.down { color: var(--expense); }
+  .holding-sub {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-bottom: 8px;
+  }
+  .holding-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .holding-actions button {
+    flex: 1;
+    padding: 8px;
+    font-size: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .holding-actions button.del { color: var(--expense); }
+
+  /* ---- Screenshots ---- */
+  .screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .screenshot-thumb {
+    position: relative;
+    padding-top: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .screenshot-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .screenshot-thumb .shot-date {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 10px;
+    text-align: center;
+    padding: 2px 0;
+  }
+  .screenshot-thumb .shot-del {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img {
+    max-width: 92vw;
+    max-height: 80vh;
+    border-radius: 12px;
+  }
+  .lightbox-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+  }
+
+  /* ---- CSV import preview ---- */
+  .csv-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .csv-row:last-child { border-bottom: none; }
+  .csv-check { width: 20px; height: 20px; margin-right: 10px; flex-shrink: 0; }
+  .csv-info { flex: 1; min-width: 0; }
+  .csv-desc { font-size: 14px; font-weight: 600; }
+  .csv-date { font-size: 12px; color: var(--sub-text); }
+  .csv-amount { font-size: 14px; font-weight: 700; white-space: nowrap; margin-left: 8px; }
+
+  /* ---- Split participants ---- */
+  .participant-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .participant-row input {
+    font-size: 15px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .participant-name { flex: 2; min-width: 0; }
+  .participant-amount { flex: 1; min-width: 0; }
+  .participant-remove {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg);
+    color: var(--expense);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .split-tabs {
+    display: flex;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 14px;
+  }
+  .split-tabs button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--sub-text);
+    border-radius: 9px;
+  }
+  .split-tabs button.active { background: var(--accent); color: #fff; }
+
+  /* ---- Settings / Backup ---- */
+  .btn-danger {
+    background: rgba(255,59,48,0.08);
+    color: var(--expense);
+    border: 1px solid rgba(255,59,48,0.3);
+  }
+  .settings-desc {
+    font-size: 13px;
+    color: var(--sub-text);
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  .settings-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>📒 簡約記帳</h1>
+  </header>
+
+  <!-- ============ PAGE: LEDGER ============ -->
+  <div class="page active" id="page-ledger">
+    <!-- Monthly Summary -->
+    <div class="card">
+      <div class="month-label" id="monthLabel"></div>
+      <div class="summary-grid">
+        <div>
+          <div class="label">收入</div>
+          <div class="value income" id="totalIncome">$0</div>
+        </div>
+        <div>
+          <div class="label">支出</div>
+          <div class="value expense" id="totalExpense">$0</div>
+        </div>
+        <div>
+          <div class="label">結餘</div>
+          <div class="value balance" id="totalBalance">$0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Form -->
+    <div class="card">
+      <div class="type-toggle" id="typeToggle">
+        <button type="button" data-type="expense" class="active">支出</button>
+        <button type="button" data-type="income">收入</button>
+      </div>
+
+      <form id="recordForm">
+        <div class="field">
+          <label for="amount">金額</label>
+          <input type="number" id="amount" inputmode="decimal" placeholder="0" min="0" step="0.01" required>
+        </div>
+
+        <div class="field" id="splitFieldWrap">
+          <label class="checkbox-label">
+            <input type="checkbox" id="splitToggle">
+            與他人分帳
+          </label>
+
+          <div id="splitDetails" style="display:none; margin-top:12px;">
+            <div class="type-toggle">
+              <button type="button" class="split-dir-btn active" data-dir="receivable">我代墊(對方還我)</button>
+              <button type="button" class="split-dir-btn" data-dir="payable">對方代墊(我還他)</button>
+            </div>
+            <div class="field">
+              <label for="splitTotal">帳單總金額</label>
+              <input type="number" id="splitTotal" inputmode="decimal" placeholder="總金額" min="0" step="0.01">
+            </div>
+            <div class="field">
+              <label for="splitPeople">分攤人數(含自己，選填，自動平分金額)</label>
+              <input type="number" id="splitPeople" inputmode="numeric" placeholder="例如 3" min="1" step="1">
+            </div>
+            <div class="field" id="participantsWrap">
+              <label>分帳對象明細(每人金額加總須等於「總金額 − 你的花費」)</label>
+              <div id="participantsList"></div>
+              <button type="button" class="submit-btn btn-outline" id="addParticipantBtn">+ 新增分帳對象</button>
+            </div>
+
+            <div class="field" id="payableNameWrap" style="display:none;">
+              <label for="splitName">分帳對象(選填)</label>
+              <input type="text" id="splitName" placeholder="例如：小明">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>類別(點「+」可新增自訂類別)</label>
+          <div class="category-grid" id="categoryGrid"></div>
+        </div>
+
+        <div class="field">
+          <label for="note">備註(選填)</label>
+          <input type="text" id="note" placeholder="例如：和同事聚餐">
+        </div>
+
+        <div class="field">
+          <label for="date">日期</label>
+          <input type="date" id="date" required>
+        </div>
+
+        <button type="submit" class="submit-btn">新增紀錄</button>
+      </form>
+    </div>
+
+    <!-- CSV Import -->
+    <div class="card import-section">
+      <h2>批次匯入信用卡明細</h2>
+      <div class="filter-row">
+        <select id="csvType">
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+        <select id="csvCategory"></select>
+      </div>
+      <input type="file" id="csvFile" accept=".csv,text/csv" style="display:none">
+      <button type="button" class="submit-btn btn-outline" id="csvImportBtn">📥 選擇 CSV 檔案</button>
+      <div id="csvPreview" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Pie Chart -->
+    <div class="card chart-section">
+      <h2>本月支出比例</h2>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="pieCanvas" width="200" height="200"></canvas>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+
+    <!-- Split overview -->
+    <div class="card split-section">
+      <h2>分帳總覽</h2>
+      <div class="split-tabs" id="splitTabs">
+        <button type="button" class="active" data-tab="pending">待結</button>
+        <button type="button" data-tab="settled">已結清</button>
+      </div>
+      <div id="splitsList"></div>
+    </div>
+
+    <!-- History -->
+    <div class="card history-section">
+      <h2>歷史紀錄</h2>
+      <div class="filter-row">
+        <select id="filterType">
+          <option value="all">全部類型</option>
+          <option value="income">收入</option>
+          <option value="expense">支出</option>
+        </select>
+        <select id="filterMonth"></select>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE: REPORT (P&L) ============ -->
+  <div class="page" id="page-report">
+    <div class="card report-section">
+      <h2>每月損益表</h2>
+      <div class="pl-header">
+        <div class="m-name">月份</div>
+        <div class="m-col">收入</div>
+        <div class="m-col">支出</div>
+        <div class="m-col">損益</div>
+      </div>
+      <div id="reportList"></div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE: INVESTMENT ============ -->
+  <div class="page" id="page-investment">
+    <div class="card">
+      <div class="month-label">目前投資組合</div>
+      <div class="inv-summary-grid">
+        <div>
+          <div class="label">總市值</div>
+          <div class="value" id="invTotalValue">$0</div>
+        </div>
+        <div>
+          <div class="label">總成本</div>
+          <div class="value" id="invTotalCost">$0</div>
+        </div>
+        <div>
+          <div class="label">總損益</div>
+          <div class="value" id="invTotalGain">$0</div>
+        </div>
+      </div>
+      <button class="share-btn" id="shareBtn">📤 分享目前股票狀況</button>
+    </div>
+
+    <div class="card">
+      <h2>新增持股</h2>
+      <form id="investForm">
+        <div class="field">
+          <label for="invName">股票名稱 / 代號</label>
+          <input type="text" id="invName" placeholder="例如：台積電 2330" required>
+        </div>
+        <div class="field">
+          <label for="invShares">持有股數</label>
+          <input type="number" id="invShares" inputmode="decimal" placeholder="0" min="0" step="1" required>
+        </div>
+        <div class="field">
+          <label for="invCost">平均成本價</label>
+          <input type="number" id="invCost" inputmode="decimal" placeholder="0" min="0" step="0.01" required>
+        </div>
+        <div class="field">
+          <label for="invPrice">目前股價</label>
+          <input type="number" id="invPrice" inputmode="decimal" placeholder="0" min="0" step="0.01" required>
+        </div>
+        <button type="submit" class="submit-btn">新增持股</button>
+      </form>
+    </div>
+
+    <div class="card investment-section">
+      <h2>持股明細</h2>
+      <div id="holdingsList"></div>
+    </div>
+
+    <div class="card">
+      <h2>持股截圖</h2>
+      <input type="file" id="screenshotFile" accept="image/*" style="display:none">
+      <button type="button" class="submit-btn btn-outline" id="screenshotUploadBtn">📷 上傳持股截圖</button>
+      <div class="screenshot-grid" id="screenshotGrid"></div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE: SETTINGS ============ -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <div class="month-label">目前資料摘要</div>
+      <div class="settings-summary" id="settingsSummary"></div>
+    </div>
+
+    <div class="card">
+      <h2>備份與還原</h2>
+      <div class="settings-desc">資料只存在這個瀏覽器裡，手機和電腦不會自動同步。匯出備份檔後傳到另一台裝置匯入，就能把兩邊的紀錄合併在一起(不會覆蓋、也不會重複)。</div>
+      <button type="button" class="submit-btn" id="exportBtn">📤 匯出並分享備份檔</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      <button type="button" class="submit-btn btn-outline" id="importBtn" style="margin-top:10px;">📥 匯入備份檔(合併資料)</button>
+    </div>
+
+    <div class="card">
+      <h2>清除資料</h2>
+      <div class="settings-desc">這會刪除這個瀏覽器裡所有記帳、投資、截圖與自訂類別資料，且無法復原。建議先匯出備份再清除。</div>
+      <button type="button" class="submit-btn btn-danger" id="clearAllBtn">🗑️ 清除本機所有資料</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-page="ledger">📒<span>記帳</span></button>
+  <button class="nav-btn" data-page="report">📊<span>損益表</span></button>
+  <button class="nav-btn" data-page="investment">📈<span>投資</span></button>
+  <button class="nav-btn" data-page="settings">⚙️<span>設定</span></button>
+</nav>
+
+<!-- Lightbox for screenshots -->
+<div class="lightbox" id="lightbox">
+  <button type="button" class="lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="" alt="持股截圖">
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'expenseTrackerRecords';
+  const CUSTOM_CAT_KEY = 'expenseTrackerCustomCategories';
+  const INVEST_KEY = 'investmentHoldings';
+  const SCREENSHOT_KEY = 'investmentScreenshots';
+
+  const DEFAULT_CATEGORIES = {
+    expense: [
+      { key: '餐飲', icon: '🍔' },
+      { key: '交通', icon: '🚌' },
+      { key: '娛樂', icon: '🎮' },
+      { key: '購物', icon: '🛍️' },
+      { key: '醫療', icon: '💊' },
+      { key: '教育', icon: '📚' },
+      { key: '居家', icon: '🏠' },
+      { key: '其他', icon: '📦' }
+    ],
+    income: [
+      { key: '薪資', icon: '💰' },
+      { key: '獎金', icon: '🎁' },
+      { key: '投資', icon: '📈' },
+      { key: '其他', icon: '📦' }
+    ]
+  };
+
+  const CHART_COLORS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#00c7be', '#007aff', '#5856d6', '#af52de', '#ff2d55', '#a2845e'];
+
+  let records = loadJSON(STORAGE_KEY, []);
+  let customCategories = loadJSON(CUSTOM_CAT_KEY, { expense: [], income: [] });
+  let investments = loadJSON(INVEST_KEY, []);
+  let screenshots = loadJSON(SCREENSHOT_KEY, []);
+  let currentType = 'expense';
+  let currentCategory = null;
+  let splitDirection = 'receivable';
+  let csvRows = [];
+  const expandedMonths = new Set();
+
+  const el = (id) => document.getElementById(id);
+
+  function loadJSON(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function save(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+  function saveRecords() { save(STORAGE_KEY, records); }
+  function saveCustomCategories() { save(CUSTOM_CAT_KEY, customCategories); }
+  function saveInvestments() { save(INVEST_KEY, investments); }
+  function saveScreenshots() { save(SCREENSHOT_KEY, screenshots); }
+
+  function formatMoney(n) {
+    const sign = n < 0 ? '-' : '';
+    return sign + '$' + Math.abs(Number(n)).toLocaleString('zh-Hant', { maximumFractionDigits: 2 });
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+
+  function getCategories(type) {
+    return DEFAULT_CATEGORIES[type].concat(customCategories[type] || []);
+  }
+
+  // Migrate legacy single-counterpart "receivable" splits to the participants array format
+  (function migrateSplits() {
+    let changed = false;
+    records.forEach(r => {
+      if (r.split && r.split.direction === 'receivable' && !r.split.participants) {
+        r.split.participants = [{
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          name: r.split.counterpartName || '',
+          amount: r.split.counterpartAmount,
+          status: r.split.status || 'pending',
+          settledRecordId: r.split.settledRecordId || null
+        }];
+        delete r.split.counterpartName;
+        delete r.split.counterpartAmount;
+        delete r.split.status;
+        delete r.split.settledRecordId;
+        changed = true;
+      }
+    });
+    if (changed) saveRecords();
+  })();
+
+  // ---------- Bottom Nav ----------
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      el('page-' + btn.dataset.page).classList.add('active');
+      if (btn.dataset.page === 'report') renderReport();
+      if (btn.dataset.page === 'investment') renderInvestments();
+      if (btn.dataset.page === 'settings') renderSettingsSummary();
+    });
+  });
+
+  // ---------- Type Toggle ----------
+  const formTypeButtons = document.querySelectorAll('#typeToggle button');
+
+  formTypeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      formTypeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentType = btn.dataset.type;
+      renderCategoryGrid();
+      el('splitFieldWrap').style.display = currentType === 'expense' ? 'block' : 'none';
+      if (currentType !== 'expense') {
+        el('splitToggle').checked = false;
+        el('splitDetails').style.display = 'none';
+      }
+    });
+  });
+
+  function renderCategoryGrid() {
+    const grid = el('categoryGrid');
+    grid.innerHTML = '';
+    const cats = getCategories(currentType);
+    const defaultCount = DEFAULT_CATEGORIES[currentType].length;
+
+    if (!currentCategory || !cats.find(c => c.key === currentCategory)) {
+      currentCategory = cats[0].key;
+    }
+
+    cats.forEach((cat, i) => {
+      const item = document.createElement('div');
+      item.className = 'cat-item';
+
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'category-btn' + (cat.key === currentCategory ? ' active' : '');
+      b.textContent = cat.icon + ' ' + cat.key;
+      b.addEventListener('click', () => {
+        grid.querySelectorAll('.category-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        currentCategory = cat.key;
+      });
+      item.appendChild(b);
+
+      if (i >= defaultCount) {
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'cat-remove';
+        rm.textContent = '×';
+        rm.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!confirm(`刪除自訂類別「${cat.key}」？(歷史紀錄不受影響)`)) return;
+          customCategories[currentType] = customCategories[currentType].filter(c => c.key !== cat.key);
+          saveCustomCategories();
+          if (currentCategory === cat.key) currentCategory = null;
+          renderCategoryGrid();
+        });
+        item.appendChild(rm);
+      }
+
+      grid.appendChild(item);
+    });
+
+    const addItem = document.createElement('div');
+    addItem.className = 'cat-item';
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'category-btn add-btn';
+    addBtn.textContent = '+ 新增';
+    addBtn.addEventListener('click', () => {
+      const name = prompt('輸入新類別名稱：');
+      if (!name) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      if (cats.find(c => c.key === trimmed)) {
+        alert('這個類別已經存在');
+        return;
+      }
+      customCategories[currentType] = customCategories[currentType] || [];
+      customCategories[currentType].push({ key: trimmed, icon: '🏷️' });
+      saveCustomCategories();
+      currentCategory = trimmed;
+      renderCategoryGrid();
+    });
+    addItem.appendChild(addBtn);
+    grid.appendChild(addItem);
+
+    populateCsvCategories();
+  }
+
+  // ---------- Split toggle UI ----------
+  function updateSplitDirectionUI() {
+    el('participantsWrap').style.display = splitDirection === 'receivable' ? 'block' : 'none';
+    el('payableNameWrap').style.display = splitDirection === 'payable' ? 'block' : 'none';
+  }
+
+  el('splitToggle').addEventListener('change', () => {
+    const checked = el('splitToggle').checked;
+    el('splitDetails').style.display = checked ? 'block' : 'none';
+    if (!checked) clearParticipants();
+  });
+
+  document.querySelectorAll('.split-dir-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.split-dir-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      splitDirection = btn.dataset.dir;
+      updateSplitDirectionUI();
+    });
+  });
+  updateSplitDirectionUI();
+
+  function addParticipantRow(name, amount) {
+    const row = document.createElement('div');
+    row.className = 'participant-row';
+    row.innerHTML = `
+      <input type="text" class="participant-name" placeholder="姓名" value="${name ? escapeHtml(name) : ''}">
+      <input type="number" class="participant-amount" placeholder="金額" min="0" step="0.01" value="${amount || ''}">
+      <button type="button" class="participant-remove">×</button>
+    `;
+    row.querySelector('.participant-remove').addEventListener('click', () => row.remove());
+    el('participantsList').appendChild(row);
+  }
+
+  function clearParticipants() {
+    el('participantsList').innerHTML = '';
+  }
+
+  el('addParticipantBtn').addEventListener('click', () => addParticipantRow('', ''));
+
+  function collectParticipants() {
+    return [...document.querySelectorAll('#participantsList .participant-row')].map(row => ({
+      name: row.querySelector('.participant-name').value.trim(),
+      amount: parseFloat(row.querySelector('.participant-amount').value)
+    })).filter(p => !isNaN(p.amount) && p.amount > 0);
+  }
+
+  function recalcSplitAmount() {
+    const total = parseFloat(el('splitTotal').value);
+    const n = parseInt(el('splitPeople').value, 10);
+    if (!(total > 0 && n > 0)) return;
+    const per = Math.round((total / n) * 100) / 100;
+    el('amount').value = per.toFixed(2);
+    if (splitDirection === 'receivable') {
+      clearParticipants();
+      for (let i = 1; i < n; i++) addParticipantRow(`朋友${i}`, per.toFixed(2));
+    }
+  }
+  el('splitTotal').addEventListener('input', recalcSplitAmount);
+  el('splitPeople').addEventListener('input', recalcSplitAmount);
+
+  // ---------- Form Submit ----------
+  el('date').value = todayStr();
+
+  el('recordForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = parseFloat(el('amount').value);
+    const date = el('date').value;
+    const note = el('note').value.trim();
+    if (!amount || amount <= 0 || !date) return;
+
+    const record = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      type: currentType,
+      category: currentCategory,
+      amount: amount,
+      date: date
+    };
+    if (note) record.note = note;
+
+    if (currentType === 'expense' && el('splitToggle').checked) {
+      const total = parseFloat(el('splitTotal').value);
+      if (!total || total <= 0) {
+        alert('請輸入帳單總金額');
+        return;
+      }
+      if (amount > total) {
+        alert('你的花費不可超過帳單總金額');
+        return;
+      }
+      const remainder = Math.round((total - amount) * 100) / 100;
+
+      if (splitDirection === 'receivable') {
+        const participants = collectParticipants();
+        const sum = Math.round(participants.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+        if (remainder > 0 && participants.length === 0) {
+          alert('請新增至少一位分帳對象');
+          return;
+        }
+        if (Math.abs(sum - remainder) > 0.01) {
+          alert(`分帳對象金額加總(${formatMoney(sum)})須等於總金額減去你的花費(${formatMoney(remainder)})`);
+          return;
+        }
+        record.split = {
+          direction: 'receivable',
+          totalAmount: total,
+          participants: participants.map(p => ({
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            name: p.name,
+            amount: p.amount,
+            status: 'pending',
+            settledRecordId: null
+          }))
+        };
+      } else {
+        record.split = {
+          direction: 'payable',
+          totalAmount: total,
+          counterpartAmount: remainder,
+          counterpartName: el('splitName').value.trim(),
+          status: remainder > 0 ? 'pending' : 'settled'
+        };
+      }
+    }
+
+    records.push(record);
+    saveRecords();
+
+    el('amount').value = '';
+    el('date').value = todayStr();
+    el('note').value = '';
+    el('splitToggle').checked = false;
+    el('splitDetails').style.display = 'none';
+    el('splitTotal').value = '';
+    el('splitPeople').value = '';
+    el('splitName').value = '';
+    clearParticipants();
+    splitDirection = 'receivable';
+    document.querySelectorAll('.split-dir-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.split-dir-btn[data-dir="receivable"]').classList.add('active');
+    updateSplitDirectionUI();
+
+    renderLedger();
+  });
+
+  // ---------- Summary (current month) ----------
+  function renderSummary() {
+    const now = new Date();
+    const ym = now.toISOString().slice(0, 7);
+    el('monthLabel').textContent = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
+
+    const monthRecords = records.filter(r => r.date.slice(0, 7) === ym);
+    const income = monthRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const expense = monthRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+
+    el('totalIncome').textContent = formatMoney(income);
+    el('totalExpense').textContent = formatMoney(expense);
+    el('totalBalance').textContent = formatMoney(income - expense);
+  }
+
+  // ---------- Pie Chart (current month, expenses) ----------
+  function renderChart() {
+    const now = new Date();
+    const ym = now.toISOString().slice(0, 7);
+    const monthExpenses = records.filter(r => r.type === 'expense' && r.date.slice(0, 7) === ym);
+
+    const canvas = el('pieCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const legend = el('legend');
+    legend.innerHTML = '';
+
+    if (monthExpenses.length === 0) {
+      const note = document.createElement('div');
+      note.className = 'empty-note';
+      note.textContent = '本月尚無支出紀錄';
+      legend.appendChild(note);
+      return;
+    }
+
+    const totals = {};
+    monthExpenses.forEach(r => {
+      totals[r.category] = (totals[r.category] || 0) + r.amount;
+    });
+
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = Math.min(cx, cy) - 4;
+    let startAngle = -Math.PI / 2;
+
+    entries.forEach(([cat, val], i) => {
+      const sliceAngle = (val / total) * Math.PI * 2;
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      startAngle += sliceAngle;
+
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      const pct = ((val / total) * 100).toFixed(1);
+      item.innerHTML = `
+        <span class="legend-dot" style="background:${color}"></span>
+        <span class="legend-name">${escapeHtml(cat)}</span>
+        <span class="legend-percent">${pct}%</span>
+        <span class="legend-amount">${formatMoney(val)}</span>
+      `;
+      legend.appendChild(item);
+    });
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  // ---------- Filters ----------
+  function populateMonthFilter() {
+    const select = el('filterMonth');
+    const months = Array.from(new Set(records.map(r => r.date.slice(0, 7)))).sort().reverse();
+    const currentVal = select.value;
+    select.innerHTML = '<option value="all">全部月份</option>' +
+      months.map(m => `<option value="${m}">${m}</option>`).join('');
+    if (months.includes(currentVal) || currentVal === 'all') {
+      select.value = currentVal || 'all';
+    }
+  }
+
+  el('filterType').addEventListener('change', renderHistory);
+  el('filterMonth').addEventListener('change', renderHistory);
+
+  // ---------- History List ----------
+  function categoryIcon(type, cat) {
+    const found = getCategories(type).find(c => c.key === cat);
+    return found ? found.icon : '📦';
+  }
+
+  function renderSplitLine(split) {
+    if (split.direction === 'payable') {
+      const who = split.counterpartName ? escapeHtml(split.counterpartName) : '朋友';
+      const statusLabel = split.status === 'settled' ? '已結清' : '未結清';
+      const color = split.status === 'settled' ? 'var(--sub-text)' : 'var(--accent)';
+      return `<div class="history-split-info" style="color:${color}">總${formatMoney(split.totalAmount)}・你應付${who}${formatMoney(split.counterpartAmount)}・${statusLabel}</div>`;
+    }
+    const parts = (split.participants || []).map(p => {
+      const name = p.name ? escapeHtml(p.name) : '朋友';
+      return `${name}${formatMoney(p.amount)}(${p.status === 'settled' ? '已收' : '未收'})`;
+    }).join('、');
+    const allSettled = (split.participants || []).length > 0 && split.participants.every(p => p.status === 'settled');
+    const color = allSettled ? 'var(--sub-text)' : 'var(--accent)';
+    return `<div class="history-split-info" style="color:${color}">總${formatMoney(split.totalAmount)}・對方應付你：${parts || '（無）'}</div>`;
+  }
+
+  function renderHistory() {
+    const list = el('historyList');
+    list.innerHTML = '';
+
+    const typeFilter = el('filterType').value;
+    const monthFilter = el('filterMonth').value;
+
+    let filtered = records.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+    if (typeFilter !== 'all') filtered = filtered.filter(r => r.type === typeFilter);
+    if (monthFilter !== 'all') filtered = filtered.filter(r => r.date.slice(0, 7) === monthFilter);
+
+    if (filtered.length === 0) {
+      const note = document.createElement('div');
+      note.className = 'empty-note';
+      note.textContent = '沒有符合條件的紀錄';
+      list.appendChild(note);
+      return;
+    }
+
+    filtered.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      const noteHtml = r.note ? `<div class="history-note">${escapeHtml(r.note)}</div>` : '';
+      const splitBadge = r.split ? '<span class="split-badge">🤝 分帳</span>' : '';
+      const splitLine = r.split ? renderSplitLine(r.split) : '';
+      item.innerHTML = `
+        <div class="history-icon">${categoryIcon(r.type, r.category)}</div>
+        <div class="history-info">
+          <div class="history-category">${escapeHtml(r.category)}${splitBadge}</div>
+          ${noteHtml}
+          <div class="history-date">${r.date}</div>
+          ${splitLine}
+        </div>
+        <div class="history-amount ${r.type}">${r.type === 'income' ? '+' : '-'}${formatMoney(r.amount)}</div>
+        <button class="delete-btn" data-id="${r.id}" aria-label="刪除">✕</button>
+      `;
+      list.appendChild(item);
+    });
+
+    list.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        records = records.filter(r => r.id !== id);
+        saveRecords();
+        renderLedger();
+      });
+    });
+  }
+
+  // ---------- Split overview ----------
+  let splitTab = 'pending';
+
+  document.querySelectorAll('#splitTabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#splitTabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      splitTab = btn.dataset.tab;
+      renderSplitsOverview();
+    });
+  });
+
+  function collectSplitItems(statusWanted) {
+    const items = [];
+    records.forEach(r => {
+      if (!r.split) return;
+      if (r.split.direction === 'payable') {
+        if (r.split.status === statusWanted) items.push({ record: r, kind: 'payable' });
+      } else {
+        (r.split.participants || []).forEach(p => {
+          if (p.status === statusWanted) items.push({ record: r, kind: 'receivable', participant: p });
+        });
+      }
+    });
+    items.sort((a, b) => b.record.date.localeCompare(a.record.date));
+    return items;
+  }
+
+  function renderSplitsOverview() {
+    const wrap = el('splitsList');
+    wrap.innerHTML = '';
+    const items = collectSplitItems(splitTab);
+
+    if (items.length === 0) {
+      wrap.innerHTML = splitTab === 'pending'
+        ? '<div class="empty-note">目前沒有待結清的分帳</div>'
+        : '<div class="empty-note">目前沒有已結清的分帳</div>';
+      return;
+    }
+
+    items.forEach(({ record: r, kind, participant }) => {
+      const s = r.split;
+      const isPending = splitTab === 'pending';
+      let dirIcon, dirLabel, amount, who, colorClass;
+
+      if (kind === 'payable') {
+        dirIcon = '📥'; dirLabel = '應付'; amount = s.counterpartAmount;
+        who = s.counterpartName || '朋友'; colorClass = 'down';
+      } else {
+        dirIcon = '📤'; dirLabel = '應收'; amount = participant.amount;
+        who = participant.name || '朋友'; colorClass = 'up';
+      }
+
+      const item = document.createElement('div');
+      item.className = 'holding-item';
+      item.innerHTML = `
+        <div class="holding-top">
+          <div class="holding-name">${dirIcon} ${escapeHtml(who)} ・ ${escapeHtml(r.category)}</div>
+          <div class="holding-gain ${colorClass}">${dirLabel} ${formatMoney(amount)}</div>
+        </div>
+        <div class="holding-sub">
+          <span>${r.date}</span>
+          <span>帳單總額 ${formatMoney(s.totalAmount)}</span>
+        </div>
+        <div class="holding-actions">
+          ${isPending ? '<button type="button" class="settle-btn">✅ 標記已結清</button>' : '<button type="button" class="unsettle-btn">↩️ 取消結清</button>'}
+        </div>
+      `;
+
+      if (isPending) {
+        item.querySelector('.settle-btn').addEventListener('click', () => {
+          if (kind === 'payable') settlePayable(r.id);
+          else settleParticipant(r.id, participant.id);
+        });
+      } else {
+        item.querySelector('.unsettle-btn').addEventListener('click', () => {
+          if (kind === 'payable') unsettlePayable(r.id);
+          else unsettleParticipant(r.id, participant.id);
+        });
+      }
+
+      wrap.appendChild(item);
+    });
+  }
+
+  function settlePayable(recordId) {
+    const r = records.find(x => x.id === recordId);
+    if (!r || !r.split) return;
+    r.split.status = 'settled';
+    saveRecords();
+    renderLedger();
+  }
+
+  function unsettlePayable(recordId) {
+    const r = records.find(x => x.id === recordId);
+    if (!r || !r.split) return;
+    r.split.status = 'pending';
+    saveRecords();
+    renderLedger();
+  }
+
+  function settleParticipant(recordId, participantId) {
+    const r = records.find(x => x.id === recordId);
+    if (!r || !r.split || !r.split.participants) return;
+    const p = r.split.participants.find(x => x.id === participantId);
+    if (!p) return;
+
+    const incomeRecord = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      type: 'income',
+      category: '其他',
+      amount: p.amount,
+      date: todayStr(),
+      note: `收到${p.name ? p.name : '朋友'}分帳款(${r.category})`
+    };
+    records.push(incomeRecord);
+    p.settledRecordId = incomeRecord.id;
+    p.status = 'settled';
+    saveRecords();
+    renderLedger();
+  }
+
+  function unsettleParticipant(recordId, participantId) {
+    const r = records.find(x => x.id === recordId);
+    if (!r || !r.split || !r.split.participants) return;
+    const p = r.split.participants.find(x => x.id === participantId);
+    if (!p) return;
+
+    if (p.settledRecordId) {
+      records = records.filter(x => x.id !== p.settledRecordId);
+      p.settledRecordId = null;
+    }
+    p.status = 'pending';
+    saveRecords();
+    renderLedger();
+  }
+
+  function renderLedger() {
+    renderSummary();
+    renderChart();
+    populateMonthFilter();
+    renderHistory();
+    renderSplitsOverview();
+  }
+
+  // ================= CSV IMPORT =================
+  function populateCsvCategories() {
+    const type = el('csvType').value;
+    const sel = el('csvCategory');
+    const prevVal = sel.value;
+    sel.innerHTML = getCategories(type).map(c => `<option value="${escapeHtml(c.key)}">${c.icon} ${escapeHtml(c.key)}</option>`).join('');
+    if ([...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
+  }
+  el('csvType').addEventListener('change', populateCsvCategories);
+
+  function parseCSVLine(line) {
+    const result = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else {
+          cur += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    result.push(cur);
+    return result.map(s => s.trim());
+  }
+
+  function parseDateFlexible(str) {
+    if (!str) return null;
+    str = str.trim();
+    let m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+    m = str.match(/^(\d{1,2})[-/](\d{1,2})$/);
+    if (m) return `${new Date().getFullYear()}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+    return null;
+  }
+
+  function parseAmountFlexible(str) {
+    if (!str) return NaN;
+    const cleaned = str.replace(/[^0-9.\-]/g, '');
+    if (!cleaned) return NaN;
+    return parseFloat(cleaned);
+  }
+
+  function parseCSV(text) {
+    const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim() !== '');
+    if (lines.length === 0) return [];
+
+    const header = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+    const dateKeys = ['日期', 'date', '交易日期', '消費日期'];
+    const noteKeys = ['說明', '描述', '備註', 'description', '商店', '摘要', '消費項目', 'note'];
+    const amountKeys = ['金額', 'amount', '消費金額', 'ntd', '台幣'];
+
+    function findIdx(keys) {
+      for (const k of keys) {
+        const idx = header.findIndex(h => h.includes(k.toLowerCase()));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    }
+
+    let dateIdx = findIdx(dateKeys);
+    let noteIdx = findIdx(noteKeys);
+    let amountIdx = findIdx(amountKeys);
+    let startRow = 1;
+
+    if (dateIdx === -1 && noteIdx === -1 && amountIdx === -1) {
+      dateIdx = 0; noteIdx = 1; amountIdx = 2; startRow = 0;
+    } else {
+      if (dateIdx === -1) dateIdx = 0;
+      if (amountIdx === -1) amountIdx = header.length - 1;
+    }
+
+    const rows = [];
+    for (let i = startRow; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      const date = parseDateFlexible(cols[dateIdx] || '');
+      const note = noteIdx >= 0 ? (cols[noteIdx] || '') : '';
+      const amount = parseAmountFlexible(cols[amountIdx] || '');
+      rows.push({ date, note, amount, valid: !!date && !isNaN(amount) && amount !== 0 });
+    }
+    return rows;
+  }
+
+  el('csvImportBtn').addEventListener('click', () => el('csvFile').click());
+  el('csvFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      csvRows = parseCSV(ev.target.result);
+      renderCsvPreview();
+    };
+    reader.readAsText(file, 'utf-8');
+    e.target.value = '';
+  });
+
+  function renderCsvPreview() {
+    const wrap = el('csvPreview');
+    wrap.innerHTML = '';
+
+    if (csvRows.length === 0) {
+      wrap.innerHTML = '<div class="empty-note">找不到可匯入的資料，請確認 CSV 格式</div>';
+      return;
+    }
+
+    const list = document.createElement('div');
+    csvRows.forEach((row, idx) => {
+      const line = document.createElement('div');
+      line.className = 'csv-row';
+      const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
+      line.innerHTML = `
+        <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? 'checked' : 'disabled'}>
+        <div class="csv-info">
+          <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}${warn}</div>
+          <div class="csv-date">${row.date || '日期無法辨識'}</div>
+        </div>
+        <div class="csv-amount" style="color:${row.amount < 0 ? 'var(--income)' : 'var(--expense)'}">${isNaN(row.amount) ? '-' : formatMoney(row.amount)}</div>
+      `;
+      list.appendChild(line);
+    });
+    wrap.appendChild(list);
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:10px;margin-top:14px;';
+    actions.innerHTML = `
+      <button type="button" class="submit-btn" id="csvConfirmBtn" style="flex:1;">確認匯入</button>
+      <button type="button" class="submit-btn btn-outline" id="csvCancelBtn" style="flex:1;">取消</button>
+    `;
+    wrap.appendChild(actions);
+
+    el('csvConfirmBtn').addEventListener('click', confirmCsvImport);
+    el('csvCancelBtn').addEventListener('click', () => { csvRows = []; wrap.innerHTML = ''; });
+  }
+
+  function confirmCsvImport() {
+    const globalType = el('csvType').value;
+    const globalCategory = el('csvCategory').value;
+    const checks = document.querySelectorAll('.csv-check');
+    let count = 0;
+
+    checks.forEach((chk, n) => {
+      if (!chk.checked) return;
+      const idx = parseInt(chk.dataset.idx, 10);
+      const row = csvRows[idx];
+      if (!row || !row.valid) return;
+      const flip = row.amount < 0;
+      const type = flip ? (globalType === 'expense' ? 'income' : 'expense') : globalType;
+      const record = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + n,
+        type,
+        category: globalCategory,
+        amount: Math.abs(row.amount),
+        date: row.date
+      };
+      if (row.note) record.note = row.note;
+      records.push(record);
+      count++;
+    });
+
+    saveRecords();
+    csvRows = [];
+    el('csvPreview').innerHTML = `<div class="empty-note">已成功匯入 ${count} 筆紀錄</div>`;
+    renderLedger();
+  }
+
+  // ================= REPORT (Monthly P&L) =================
+  function renderReport() {
+    const list = el('reportList');
+    list.innerHTML = '';
+
+    const months = Array.from(new Set(records.map(r => r.date.slice(0, 7)))).sort().reverse();
+
+    if (months.length === 0) {
+      list.innerHTML = '<div class="empty-note">尚無紀錄可統計</div>';
+      return;
+    }
+
+    months.forEach(ym => {
+      const monthRecords = records.filter(r => r.date.slice(0, 7) === ym);
+      const income = monthRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+      const expense = monthRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+      const net = income - expense;
+
+      const [y, m] = ym.split('-');
+      const row = document.createElement('div');
+      row.className = 'month-row';
+
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'month-row-header';
+      header.innerHTML = `
+        <div class="m-name">${y}年${parseInt(m, 10)}月</div>
+        <div class="m-col" style="color:var(--income)">${formatMoney(income)}</div>
+        <div class="m-col" style="color:var(--expense)">${formatMoney(expense)}</div>
+        <div class="m-col" style="color:${net >= 0 ? 'var(--income)' : 'var(--expense)'};font-weight:700">${formatMoney(net)}</div>
+      `;
+
+      const detail = document.createElement('div');
+      detail.className = 'month-detail' + (expandedMonths.has(ym) ? ' open' : '');
+
+      const expenseTotals = {};
+      const incomeTotals = {};
+      monthRecords.forEach(r => {
+        const bucket = r.type === 'expense' ? expenseTotals : incomeTotals;
+        bucket[r.category] = (bucket[r.category] || 0) + r.amount;
+      });
+
+      function detailBlock(title, totals, colorVar) {
+        const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+        if (entries.length === 0) return '';
+        let html = `<div class="detail-title">${title}</div>`;
+        entries.forEach(([cat, val]) => {
+          html += `<div class="detail-item"><span>${escapeHtml(cat)}</span><span style="color:${colorVar}">${formatMoney(val)}</span></div>`;
+        });
+        return html;
+      }
+
+      detail.innerHTML =
+        detailBlock('支出明細', expenseTotals, 'var(--expense)') +
+        detailBlock('收入明細', incomeTotals, 'var(--income)');
+
+      header.addEventListener('click', () => {
+        if (expandedMonths.has(ym)) {
+          expandedMonths.delete(ym);
+          detail.classList.remove('open');
+        } else {
+          expandedMonths.add(ym);
+          detail.classList.add('open');
+        }
+      });
+
+      row.appendChild(header);
+      row.appendChild(detail);
+      list.appendChild(row);
+    });
+  }
+
+  // ================= INVESTMENT =================
+  el('investForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = el('invName').value.trim();
+    const shares = parseFloat(el('invShares').value);
+    const cost = parseFloat(el('invCost').value);
+    const price = parseFloat(el('invPrice').value);
+    if (!name || !shares || shares <= 0 || isNaN(cost) || isNaN(price)) return;
+
+    investments.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name, shares, costPrice: cost, currentPrice: price
+    });
+    saveInvestments();
+
+    el('invName').value = '';
+    el('invShares').value = '';
+    el('invCost').value = '';
+    el('invPrice').value = '';
+
+    renderInvestments();
+  });
+
+  function investStats() {
+    let totalValue = 0, totalCost = 0;
+    investments.forEach(h => {
+      totalValue += h.shares * h.currentPrice;
+      totalCost += h.shares * h.costPrice;
+    });
+    return { totalValue, totalCost, totalGain: totalValue - totalCost };
+  }
+
+  function renderInvestments() {
+    const { totalValue, totalCost, totalGain } = investStats();
+    el('invTotalValue').textContent = formatMoney(totalValue);
+    el('invTotalCost').textContent = formatMoney(totalCost);
+    const gainEl = el('invTotalGain');
+    gainEl.textContent = formatMoney(totalGain);
+    gainEl.style.color = totalGain >= 0 ? 'var(--income)' : 'var(--expense)';
+
+    const list = el('holdingsList');
+    list.innerHTML = '';
+
+    if (investments.length === 0) {
+      list.innerHTML = '<div class="empty-note">尚未新增任何持股</div>';
+    } else {
+      investments.forEach(h => {
+        const marketValue = h.shares * h.currentPrice;
+        const costValue = h.shares * h.costPrice;
+        const gain = marketValue - costValue;
+        const gainPct = costValue > 0 ? (gain / costValue) * 100 : 0;
+        const up = gain >= 0;
+
+        const item = document.createElement('div');
+        item.className = 'holding-item';
+        item.innerHTML = `
+          <div class="holding-top">
+            <div class="holding-name">${escapeHtml(h.name)}</div>
+            <div class="holding-gain ${up ? 'up' : 'down'}">${up ? '+' : ''}${formatMoney(gain)} (${up ? '+' : ''}${gainPct.toFixed(1)}%)</div>
+          </div>
+          <div class="holding-sub">
+            <span>${h.shares} 股 @ 成本 ${h.costPrice}</span>
+            <span>目前 ${h.currentPrice} ・ 市值 ${formatMoney(marketValue)}</span>
+          </div>
+          <div class="holding-actions">
+            <button type="button" class="edit-price">✏️ 更新股價</button>
+            <button type="button" class="del">🗑️ 刪除</button>
+          </div>
+        `;
+
+        item.querySelector('.edit-price').addEventListener('click', () => {
+          const newPrice = prompt(`輸入「${h.name}」目前股價：`, h.currentPrice);
+          if (newPrice === null) return;
+          const num = parseFloat(newPrice);
+          if (isNaN(num) || num < 0) return;
+          h.currentPrice = num;
+          saveInvestments();
+          renderInvestments();
+        });
+
+        item.querySelector('.del').addEventListener('click', () => {
+          if (!confirm(`刪除持股「${h.name}」？`)) return;
+          investments = investments.filter(x => x.id !== h.id);
+          saveInvestments();
+          renderInvestments();
+        });
+
+        list.appendChild(item);
+      });
+    }
+
+    renderScreenshots();
+  }
+
+  el('shareBtn').addEventListener('click', async () => {
+    const { totalValue, totalCost, totalGain } = investStats();
+    const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+    const dateStr = todayStr();
+
+    let text = `📈 投資組合狀況 (${dateStr})\n--------------------------\n`;
+    if (investments.length === 0) {
+      text += '（尚無持股紀錄）\n';
+    } else {
+      investments.forEach(h => {
+        const marketValue = h.shares * h.currentPrice;
+        const costValue = h.shares * h.costPrice;
+        const gain = marketValue - costValue;
+        const gainPct2 = costValue > 0 ? (gain / costValue) * 100 : 0;
+        text += `${h.name}: ${h.shares}股 @ 目前 ${h.currentPrice} (成本 ${h.costPrice}) 損益 ${gain >= 0 ? '+' : ''}${formatMoney(gain)} (${gain >= 0 ? '+' : ''}${gainPct2.toFixed(1)}%)\n`;
+      });
+    }
+    text += `--------------------------\n總市值: ${formatMoney(totalValue)}\n總成本: ${formatMoney(totalCost)}\n總損益: ${totalGain >= 0 ? '+' : ''}${formatMoney(totalGain)} (${totalGain >= 0 ? '+' : ''}${gainPct.toFixed(1)}%)`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '投資組合狀況', text });
+        return;
+      } catch (e) {
+        // user cancelled or share failed, fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('已複製投資狀況到剪貼簿，可貼上傳送給朋友或自己');
+    } catch (e) {
+      alert(text);
+    }
+  });
+
+  // ================= INVESTMENT SCREENSHOTS =================
+  el('screenshotUploadBtn').addEventListener('click', () => el('screenshotFile').click());
+  el('screenshotFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 900;
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+        screenshots.push({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          dataUrl,
+          date: todayStr()
+        });
+        try {
+          saveScreenshots();
+        } catch (err) {
+          screenshots.pop();
+          alert('儲存空間已滿，請先刪除部分截圖再試一次');
+          return;
+        }
+        renderScreenshots();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  function renderScreenshots() {
+    const grid = el('screenshotGrid');
+    grid.innerHTML = '';
+    if (screenshots.length === 0) {
+      grid.innerHTML = '<div class="empty-note">尚未上傳任何截圖</div>';
+      return;
+    }
+    screenshots.slice().reverse().forEach(s => {
+      const thumb = document.createElement('div');
+      thumb.className = 'screenshot-thumb';
+      thumb.innerHTML = `
+        <img src="${s.dataUrl}" alt="持股截圖">
+        <div class="shot-date">${s.date}</div>
+        <button type="button" class="shot-del">×</button>
+      `;
+      thumb.querySelector('img').addEventListener('click', () => openLightbox(s.dataUrl));
+      thumb.querySelector('.shot-del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm('刪除這張截圖？')) return;
+        screenshots = screenshots.filter(x => x.id !== s.id);
+        saveScreenshots();
+        renderScreenshots();
+      });
+      grid.appendChild(thumb);
+    });
+  }
+
+  function openLightbox(src) {
+    el('lightboxImg').src = src;
+    el('lightbox').classList.add('open');
+  }
+  function closeLightbox() {
+    el('lightbox').classList.remove('open');
+    el('lightboxImg').src = '';
+  }
+  el('lightboxClose').addEventListener('click', closeLightbox);
+  el('lightbox').addEventListener('click', (e) => {
+    if (e.target.id === 'lightbox') closeLightbox();
+  });
+
+  // ================= SETTINGS / BACKUP =================
+  function renderSettingsSummary() {
+    const wrap = el('settingsSummary');
+    const catCount = (customCategories.expense || []).length + (customCategories.income || []).length;
+    wrap.innerHTML = `
+      <div><div class="label">記帳紀錄</div><div class="value">${records.length} 筆</div></div>
+      <div><div class="label">投資持股</div><div class="value">${investments.length} 檔</div></div>
+      <div><div class="label">持股截圖</div><div class="value">${screenshots.length} 張</div></div>
+      <div><div class="label">自訂類別</div><div class="value">${catCount} 個</div></div>
+    `;
+  }
+
+  function buildBackup() {
+    return {
+      app: 'expense-tracker',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      records,
+      customCategories,
+      investments,
+      screenshots
+    };
+  }
+
+  el('exportBtn').addEventListener('click', async () => {
+    const json = JSON.stringify(buildBackup(), null, 2);
+    const filename = `簡約記帳備份_${todayStr()}.json`;
+    const file = new File([json], filename, { type: 'application/json' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: '記帳備份' });
+        return;
+      } catch (e) {
+        // user cancelled or share failed, fall through to direct download
+      }
+    }
+
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  el('importBtn').addEventListener('click', () => el('importFile').click());
+  el('importFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let data;
+      try {
+        data = JSON.parse(ev.target.result);
+      } catch (err) {
+        alert('這不是有效的備份檔案');
+        return;
+      }
+      mergeBackup(data);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  function mergeBackup(data) {
+    let addedRecords = 0, addedInvestments = 0, addedScreenshots = 0, addedCategories = 0;
+
+    if (Array.isArray(data.records)) {
+      const existingIds = new Set(records.map(r => r.id));
+      data.records.forEach(r => {
+        if (r && r.id && !existingIds.has(r.id)) {
+          records.push(r);
+          existingIds.add(r.id);
+          addedRecords++;
+        }
+      });
+    }
+
+    if (data.customCategories) {
+      ['expense', 'income'].forEach(type => {
+        const incoming = data.customCategories[type];
+        if (!Array.isArray(incoming)) return;
+        customCategories[type] = customCategories[type] || [];
+        const existingKeys = new Set(customCategories[type].map(c => c.key));
+        incoming.forEach(c => {
+          if (c && c.key && !existingKeys.has(c.key)) {
+            customCategories[type].push(c);
+            existingKeys.add(c.key);
+            addedCategories++;
+          }
+        });
+      });
+    }
+
+    if (Array.isArray(data.investments)) {
+      const existingIds = new Set(investments.map(i => i.id));
+      data.investments.forEach(i => {
+        if (i && i.id && !existingIds.has(i.id)) {
+          investments.push(i);
+          existingIds.add(i.id);
+          addedInvestments++;
+        }
+      });
+    }
+
+    const originalScreenshots = screenshots.slice();
+    if (Array.isArray(data.screenshots)) {
+      const existingIds = new Set(screenshots.map(s => s.id));
+      data.screenshots.forEach(s => {
+        if (s && s.id && !existingIds.has(s.id)) {
+          screenshots.push(s);
+          existingIds.add(s.id);
+          addedScreenshots++;
+        }
+      });
+    }
+
+    saveRecords();
+    saveCustomCategories();
+    saveInvestments();
+    try {
+      saveScreenshots();
+    } catch (err) {
+      screenshots = originalScreenshots;
+      addedScreenshots = 0;
+      alert('部分截圖因儲存空間已滿而未能匯入，其餘資料已合併完成');
+    }
+
+    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別`);
+
+    renderCategoryGrid();
+    renderLedger();
+    renderInvestments();
+    renderSettingsSummary();
+  }
+
+  el('clearAllBtn').addEventListener('click', () => {
+    if (!confirm('確定要清除本機所有記帳、投資、截圖與類別資料嗎？此動作無法復原。')) return;
+    if (!confirm('再次確認：真的要清除全部資料嗎？建議先匯出備份。')) return;
+
+    records = [];
+    customCategories = { expense: [], income: [] };
+    investments = [];
+    screenshots = [];
+    saveRecords();
+    saveCustomCategories();
+    saveInvestments();
+    saveScreenshots();
+
+    renderCategoryGrid();
+    renderLedger();
+    renderInvestments();
+    renderSettingsSummary();
+  });
+
+  // ---------- Init ----------
+  renderCategoryGrid();
+  el('splitFieldWrap').style.display = currentType === 'expense' ? 'block' : 'none';
+  renderLedger();
+  renderSettingsSummary();
+})();
+</script>
+
+</body>
+</html>
