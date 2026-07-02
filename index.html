@@ -1932,33 +1932,43 @@
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
+    reader.onerror = () => {
+      alert('讀取檔案失敗，請換一張圖片再試一次');
+    };
     reader.onload = (ev) => {
       const img = new Image();
+      img.onerror = () => {
+        alert('這張圖片無法解析(可能是不支援的格式，例如 HEIC)，請改用截圖或轉成 JPG/PNG 後再上傳');
+      };
       img.onload = () => {
-        const maxW = 900;
-        const scale = Math.min(1, maxW / img.width);
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-        screenshots.push({
-          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-          dataUrl,
-          date: todayStr()
-        });
         try {
-          saveScreenshots();
+          const maxW = 900;
+          const scale = Math.min(1, maxW / img.width);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+          screenshots.push({
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            dataUrl,
+            date: todayStr()
+          });
+          try {
+            saveScreenshots();
+          } catch (err) {
+            screenshots.pop();
+            alert('儲存空間已滿，請先刪除部分截圖再試一次');
+            return;
+          }
+          renderScreenshots();
         } catch (err) {
-          screenshots.pop();
-          alert('儲存空間已滿，請先刪除部分截圖再試一次');
-          return;
+          alert('處理圖片時發生錯誤：' + err.message);
         }
-        renderScreenshots();
       };
       img.src = ev.target.result;
     };
