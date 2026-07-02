@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>簡約記帳</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007aff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="簡約記帳">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root {
     --bg: #f5f5f7;
@@ -644,6 +651,111 @@
     text-align: center;
     min-width: 0;
   }
+
+  /* ---- Backup reminder banner ---- */
+  .backup-banner {
+    background: #fff3e0;
+    border: 1px solid #ffcc80;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .backup-banner-text {
+    font-size: 13px;
+    color: #b25e00;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .backup-banner-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .backup-banner-actions button {
+    flex: 1;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+  }
+  #backupNowBtn { background: #ff9500; color: #fff; }
+  #backupLaterBtn { background: #fff; color: #b25e00; border: 1px solid #ffcc80; }
+
+  /* ---- Edit banner ---- */
+  .edit-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0,122,255,0.1);
+    color: var(--accent);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .edit-banner button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: underline;
+  }
+
+  /* ---- Date quick buttons ---- */
+  .date-quick {
+    display: flex;
+    gap: 8px;
+  }
+  .date-quick-btn {
+    flex: 1;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .date-quick-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* ---- Toast ---- */
+  .toast {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: rgba(28,28,30,0.92);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    max-width: 90%;
+    text-align: center;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .category-btn.more-btn {
+    border-style: dashed;
+    color: var(--sub-text);
+    border-color: var(--sub-text);
+  }
 </style>
 </head>
 <body>
@@ -655,6 +767,14 @@
 
   <!-- ============ PAGE: LEDGER ============ -->
   <div class="page active" id="page-ledger">
+    <div class="backup-banner" id="backupBanner" style="display:none;">
+      <div class="backup-banner-text" id="backupBannerText"></div>
+      <div class="backup-banner-actions">
+        <button type="button" id="backupNowBtn">立即備份</button>
+        <button type="button" id="backupLaterBtn">稍後</button>
+      </div>
+    </div>
+
     <!-- Monthly Summary -->
     <div class="card">
       <div class="month-label" id="monthLabel"></div>
@@ -674,68 +794,74 @@
       </div>
     </div>
 
-    <!-- Input Form -->
+    <!-- Input Form (Quick Entry) -->
     <div class="card">
+      <div class="edit-banner" id="editBanner" style="display:none;">
+        <span id="editBannerText">✏️ 正在編輯這筆紀錄</span>
+        <button type="button" id="editCancelBtn">取消編輯</button>
+      </div>
+
       <div class="type-toggle" id="typeToggle">
         <button type="button" data-type="expense" class="active">支出</button>
         <button type="button" data-type="income">收入</button>
       </div>
 
-      <form id="recordForm">
-        <div class="field">
-          <label for="amount">金額</label>
-          <input type="number" id="amount" inputmode="decimal" placeholder="0" min="0" step="0.01" required>
+      <div class="field">
+        <label for="amount">金額</label>
+        <input type="number" id="amount" inputmode="decimal" placeholder="0" min="0" step="0.01" autofocus>
+      </div>
+
+      <div class="field">
+        <label for="date">日期</label>
+        <div class="date-quick" id="dateQuick">
+          <button type="button" class="date-quick-btn active" data-offset="0">今天</button>
+          <button type="button" class="date-quick-btn" data-offset="-1">昨天</button>
         </div>
+        <input type="date" id="date" style="margin-top:8px;">
+      </div>
 
-        <div class="field" id="splitFieldWrap">
-          <label class="checkbox-label">
-            <input type="checkbox" id="splitToggle">
-            與他人分帳
-          </label>
+      <div class="field">
+        <label for="note">備註(選填)</label>
+        <input type="text" id="note" placeholder="例如：和同事聚餐">
+      </div>
 
-          <div id="splitDetails" style="display:none; margin-top:12px;">
-            <div class="type-toggle">
-              <button type="button" class="split-dir-btn active" data-dir="receivable">我代墊(對方還我)</button>
-              <button type="button" class="split-dir-btn" data-dir="payable">對方代墊(我還他)</button>
-            </div>
-            <div class="field">
-              <label for="splitTotal">帳單總金額</label>
-              <input type="number" id="splitTotal" inputmode="decimal" placeholder="總金額" min="0" step="0.01">
-            </div>
-            <div class="field">
-              <label for="splitPeople">分攤人數(含自己，選填，自動平分金額)</label>
-              <input type="number" id="splitPeople" inputmode="numeric" placeholder="例如 3" min="1" step="1">
-            </div>
-            <div class="field" id="participantsWrap">
-              <label>分帳對象明細(每人金額加總須等於「總金額 − 你的花費」)</label>
-              <div id="participantsList"></div>
-              <button type="button" class="submit-btn btn-outline" id="addParticipantBtn">+ 新增分帳對象</button>
-            </div>
+      <div class="field" id="splitFieldWrap">
+        <label class="checkbox-label">
+          <input type="checkbox" id="splitToggle">
+          與他人分帳
+        </label>
 
-            <div class="field" id="payableNameWrap" style="display:none;">
-              <label for="splitName">分帳對象(選填)</label>
-              <input type="text" id="splitName" placeholder="例如：小明">
-            </div>
+        <div id="splitDetails" style="display:none; margin-top:12px;">
+          <div class="type-toggle">
+            <button type="button" class="split-dir-btn active" data-dir="receivable">我代墊(對方還我)</button>
+            <button type="button" class="split-dir-btn" data-dir="payable">對方代墊(我還他)</button>
+          </div>
+          <div class="field">
+            <label for="splitTotal">帳單總金額</label>
+            <input type="number" id="splitTotal" inputmode="decimal" placeholder="總金額" min="0" step="0.01">
+          </div>
+          <div class="field">
+            <label for="splitPeople">分攤人數(含自己，選填，自動平分金額)</label>
+            <input type="number" id="splitPeople" inputmode="numeric" placeholder="例如 3" min="1" step="1">
+          </div>
+          <div class="field" id="participantsWrap">
+            <label>分帳對象明細(每人金額加總須等於「總金額 − 你的花費」)</label>
+            <div id="participantsList"></div>
+            <button type="button" class="submit-btn btn-outline" id="addParticipantBtn">+ 新增分帳對象</button>
+          </div>
+
+          <div class="field" id="payableNameWrap" style="display:none;">
+            <label for="splitName">分帳對象(選填)</label>
+            <input type="text" id="splitName" placeholder="例如：小明">
           </div>
         </div>
+      </div>
 
-        <div class="field">
-          <label>類別(點「+」可新增自訂類別)</label>
-          <div class="category-grid" id="categoryGrid"></div>
-        </div>
-
-        <div class="field">
-          <label for="note">備註(選填)</label>
-          <input type="text" id="note" placeholder="例如：和同事聚餐">
-        </div>
-
-        <div class="field">
-          <label for="date">日期</label>
-          <input type="date" id="date" required>
-        </div>
-
-        <button type="submit" class="submit-btn">新增紀錄</button>
-      </form>
+      <div class="field">
+        <label>類別(點選即自動記錄這一筆)</label>
+        <div class="category-grid" id="categoryGrid"></div>
+        <div class="category-grid" id="categoryGridMore" style="display:none; margin-top:10px;"></div>
+      </div>
     </div>
 
     <!-- CSV Import -->
@@ -890,6 +1016,9 @@
   <button class="nav-btn" data-page="settings">⚙️<span>設定</span></button>
 </nav>
 
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <!-- Lightbox for screenshots -->
 <div class="lightbox" id="lightbox">
   <button type="button" class="lightbox-close" id="lightboxClose">✕</button>
@@ -903,6 +1032,9 @@
   const CUSTOM_CAT_KEY = 'expenseTrackerCustomCategories';
   const INVEST_KEY = 'investmentHoldings';
   const SCREENSHOT_KEY = 'investmentScreenshots';
+  const CATEGORY_USAGE_KEY = 'expenseTrackerCategoryUsage';
+  const LAST_BACKUP_KEY = 'expenseTrackerLastBackupAt';
+  const REMINDER_DISMISSED_KEY = 'expenseTrackerReminderDismissedDate';
 
   const DEFAULT_CATEGORIES = {
     expense: [
@@ -929,10 +1061,12 @@
   let customCategories = loadJSON(CUSTOM_CAT_KEY, { expense: [], income: [] });
   let investments = loadJSON(INVEST_KEY, []);
   let screenshots = loadJSON(SCREENSHOT_KEY, []);
+  let categoryUsage = loadJSON(CATEGORY_USAGE_KEY, { expense: {}, income: {} });
   let currentType = 'expense';
   let currentCategory = null;
   let splitDirection = 'receivable';
   let csvRows = [];
+  let editingRecordId = null;
   const expandedMonths = new Set();
 
   const el = (id) => document.getElementById(id);
@@ -952,6 +1086,13 @@
   function saveCustomCategories() { save(CUSTOM_CAT_KEY, customCategories); }
   function saveInvestments() { save(INVEST_KEY, investments); }
   function saveScreenshots() { save(SCREENSHOT_KEY, screenshots); }
+  function saveCategoryUsage() { save(CATEGORY_USAGE_KEY, categoryUsage); }
+
+  function bumpCategoryUsage(type, key) {
+    categoryUsage[type] = categoryUsage[type] || {};
+    categoryUsage[type][key] = (categoryUsage[type][key] || 0) + 1;
+    saveCategoryUsage();
+  }
 
   function formatMoney(n) {
     const sign = n < 0 ? '-' : '';
@@ -1023,48 +1164,80 @@
     });
   });
 
-  function renderCategoryGrid() {
-    const grid = el('categoryGrid');
-    grid.innerHTML = '';
-    const cats = getCategories(currentType);
-    const defaultCount = DEFAULT_CATEGORIES[currentType].length;
+  function getSortedCategories(type) {
+    const all = getCategories(type);
+    const usage = categoryUsage[type] || {};
+    return all.slice().sort((a, b) => (usage[b.key] || 0) - (usage[a.key] || 0));
+  }
 
-    if (!currentCategory || !cats.find(c => c.key === currentCategory)) {
-      currentCategory = cats[0].key;
+  function makeCategoryItem(cat, isCustom, onPick) {
+    const item = document.createElement('div');
+    item.className = 'cat-item';
+
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'category-btn' + (cat.key === currentCategory ? ' active' : '');
+    b.textContent = cat.icon + ' ' + cat.key;
+    b.addEventListener('click', () => {
+      currentCategory = cat.key;
+      onPick(cat.key);
+    });
+    item.appendChild(b);
+
+    if (isCustom) {
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'cat-remove';
+      rm.textContent = '×';
+      rm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm(`刪除自訂類別「${cat.key}」？(歷史紀錄不受影響)`)) return;
+        customCategories[currentType] = customCategories[currentType].filter(c => c.key !== cat.key);
+        saveCustomCategories();
+        if (currentCategory === cat.key) currentCategory = null;
+        renderCategoryGrid();
+      });
+      item.appendChild(rm);
     }
 
-    cats.forEach((cat, i) => {
-      const item = document.createElement('div');
-      item.className = 'cat-item';
+    return item;
+  }
 
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'category-btn' + (cat.key === currentCategory ? ' active' : '');
-      b.textContent = cat.icon + ' ' + cat.key;
-      b.addEventListener('click', () => {
-        grid.querySelectorAll('.category-btn').forEach(x => x.classList.remove('active'));
-        b.classList.add('active');
-        currentCategory = cat.key;
-      });
-      item.appendChild(b);
+  function renderCategoryGrid() {
+    const grid = el('categoryGrid');
+    const moreGrid = el('categoryGridMore');
+    grid.innerHTML = '';
+    moreGrid.innerHTML = '';
+    moreGrid.style.display = 'none';
 
-      if (i >= defaultCount) {
-        const rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'cat-remove';
-        rm.textContent = '×';
-        rm.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (!confirm(`刪除自訂類別「${cat.key}」？(歷史紀錄不受影響)`)) return;
-          customCategories[currentType] = customCategories[currentType].filter(c => c.key !== cat.key);
-          saveCustomCategories();
-          if (currentCategory === cat.key) currentCategory = null;
-          renderCategoryGrid();
-        });
-        item.appendChild(rm);
-      }
+    const sorted = getSortedCategories(currentType);
+    const defaultKeys = new Set(DEFAULT_CATEGORIES[currentType].map(c => c.key));
 
-      grid.appendChild(item);
+    if (!currentCategory || !sorted.find(c => c.key === currentCategory)) {
+      currentCategory = sorted[0] ? sorted[0].key : null;
+    }
+
+    const TOP_N = 7;
+    const top = sorted.slice(0, TOP_N);
+
+    top.forEach(cat => {
+      grid.appendChild(makeCategoryItem(cat, !defaultKeys.has(cat.key), (key) => commitQuickEntry(key)));
+    });
+
+    const moreItem = document.createElement('div');
+    moreItem.className = 'cat-item';
+    const moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.className = 'category-btn more-btn';
+    moreBtn.textContent = '⋯ 更多';
+    moreBtn.addEventListener('click', () => {
+      moreGrid.style.display = moreGrid.style.display === 'none' ? 'grid' : 'none';
+    });
+    moreItem.appendChild(moreBtn);
+    grid.appendChild(moreItem);
+
+    sorted.forEach(cat => {
+      moreGrid.appendChild(makeCategoryItem(cat, !defaultKeys.has(cat.key), (key) => commitQuickEntry(key)));
     });
 
     const addItem = document.createElement('div');
@@ -1078,7 +1251,7 @@
       if (!name) return;
       const trimmed = name.trim();
       if (!trimmed) return;
-      if (cats.find(c => c.key === trimmed)) {
+      if (sorted.find(c => c.key === trimmed)) {
         alert('這個類別已經存在');
         return;
       }
@@ -1087,9 +1260,10 @@
       saveCustomCategories();
       currentCategory = trimmed;
       renderCategoryGrid();
+      moreGrid.style.display = 'grid';
     });
     addItem.appendChild(addBtn);
-    grid.appendChild(addItem);
+    moreGrid.appendChild(addItem);
 
     populateCsvCategories();
   }
@@ -1155,33 +1329,123 @@
   el('splitTotal').addEventListener('input', recalcSplitAmount);
   el('splitPeople').addEventListener('input', recalcSplitAmount);
 
-  // ---------- Form Submit ----------
-  el('date').value = todayStr();
+  // ---------- Toast ----------
+  let toastTimer = null;
+  function showToast(message) {
+    const t = el('toast');
+    t.textContent = message;
+    t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
 
-  el('recordForm').addEventListener('submit', (e) => {
-    e.preventDefault();
+  // ---------- Date quick buttons ----------
+  function isoDateWithOffset(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function syncDateQuickButtons() {
+    const val = el('date').value;
+    document.querySelectorAll('.date-quick-btn').forEach(b => {
+      b.classList.toggle('active', isoDateWithOffset(parseInt(b.dataset.offset, 10)) === val);
+    });
+  }
+
+  document.querySelectorAll('.date-quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el('date').value = isoDateWithOffset(parseInt(btn.dataset.offset, 10));
+      syncDateQuickButtons();
+    });
+  });
+  el('date').addEventListener('change', syncDateQuickButtons);
+
+  // ---------- Edit mode ----------
+  function enterEditMode(record) {
+    editingRecordId = record.id;
+
+    document.querySelectorAll('#typeToggle button').forEach(b => b.classList.toggle('active', b.dataset.type === record.type));
+    currentType = record.type;
+    el('splitFieldWrap').style.display = currentType === 'expense' ? 'block' : 'none';
+
+    el('amount').value = record.amount;
+    el('date').value = record.date;
+    syncDateQuickButtons();
+    el('note').value = record.note || '';
+
+    el('splitToggle').checked = false;
+    el('splitDetails').style.display = 'none';
+    el('splitTotal').value = '';
+    el('splitPeople').value = '';
+    el('splitName').value = '';
+    clearParticipants();
+
+    currentCategory = record.category;
+    renderCategoryGrid();
+    el('categoryGridMore').style.display = 'grid';
+
+    el('editBannerText').textContent = `✏️ 正在編輯:${record.date} ${record.category} ${formatMoney(record.amount)}${record.split ? '(此筆分帳資料不會被本次編輯覆蓋)' : ''}`;
+    el('editBanner').style.display = 'flex';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    el('amount').focus();
+  }
+
+  function exitEditMode() {
+    editingRecordId = null;
+    el('editBanner').style.display = 'none';
+    el('amount').value = '';
+    el('note').value = '';
+    el('date').value = todayStr();
+    syncDateQuickButtons();
+    el('splitToggle').checked = false;
+    el('splitDetails').style.display = 'none';
+    el('splitTotal').value = '';
+    el('splitPeople').value = '';
+    el('splitName').value = '';
+    clearParticipants();
+    el('categoryGridMore').style.display = 'none';
+  }
+
+  el('editCancelBtn').addEventListener('click', exitEditMode);
+
+  // ---------- Commit (create or update) a record ----------
+  el('date').value = todayStr();
+  syncDateQuickButtons();
+
+  function commitQuickEntry(categoryKey) {
     const amount = parseFloat(el('amount').value);
     const date = el('date').value;
     const note = el('note').value.trim();
-    if (!amount || amount <= 0 || !date) return;
 
-    const record = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      type: currentType,
-      category: currentCategory,
-      amount: amount,
-      date: date
-    };
-    if (note) record.note = note;
+    if (!amount || amount <= 0) {
+      el('amount').focus();
+      showToast('請先輸入金額');
+      return;
+    }
+    if (!date) {
+      showToast('請選擇日期');
+      return;
+    }
+
+    const isEditing = !!editingRecordId;
+    const existing = isEditing ? records.find(r => r.id === editingRecordId) : null;
+    if (isEditing && !existing) { exitEditMode(); return; }
+
+    // Build a draft first; only mutate/commit state once all validation has passed,
+    // so a failed split validation never leaves the in-memory record half-updated.
+    const draft = { type: currentType, category: categoryKey, amount, date };
+    if (note) draft.note = note;
 
     if (currentType === 'expense' && el('splitToggle').checked) {
       const total = parseFloat(el('splitTotal').value);
       if (!total || total <= 0) {
-        alert('請輸入帳單總金額');
+        showToast('請輸入帳單總金額');
         return;
       }
       if (amount > total) {
-        alert('你的花費不可超過帳單總金額');
+        showToast('你的花費不可超過帳單總金額');
         return;
       }
       const remainder = Math.round((total - amount) * 100) / 100;
@@ -1190,14 +1454,14 @@
         const participants = collectParticipants();
         const sum = Math.round(participants.reduce((s, p) => s + p.amount, 0) * 100) / 100;
         if (remainder > 0 && participants.length === 0) {
-          alert('請新增至少一位分帳對象');
+          showToast('請新增至少一位分帳對象');
           return;
         }
         if (Math.abs(sum - remainder) > 0.01) {
           alert(`分帳對象金額加總(${formatMoney(sum)})須等於總金額減去你的花費(${formatMoney(remainder)})`);
           return;
         }
-        record.split = {
+        draft.split = {
           direction: 'receivable',
           totalAmount: total,
           participants: participants.map(p => ({
@@ -1209,7 +1473,7 @@
           }))
         };
       } else {
-        record.split = {
+        draft.split = {
           direction: 'payable',
           totalAmount: total,
           counterpartAmount: remainder,
@@ -1217,27 +1481,52 @@
           status: remainder > 0 ? 'pending' : 'settled'
         };
       }
+    } else if (currentType === 'expense' && existing && existing.split) {
+      // Preserve an existing split unless the user explicitly configured a new one above
+      draft.split = existing.split;
     }
 
-    records.push(record);
+    bumpCategoryUsage(currentType, categoryKey);
+
+    if (isEditing) {
+      existing.type = draft.type;
+      existing.category = draft.category;
+      existing.amount = draft.amount;
+      existing.date = draft.date;
+      if (draft.note) existing.note = draft.note; else delete existing.note;
+      if (draft.split) existing.split = draft.split; else delete existing.split;
+    } else {
+      draft.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      records.push(draft);
+    }
     saveRecords();
 
-    el('amount').value = '';
-    el('date').value = todayStr();
-    el('note').value = '';
-    el('splitToggle').checked = false;
-    el('splitDetails').style.display = 'none';
-    el('splitTotal').value = '';
-    el('splitPeople').value = '';
-    el('splitName').value = '';
-    clearParticipants();
-    splitDirection = 'receivable';
-    document.querySelectorAll('.split-dir-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.split-dir-btn[data-dir="receivable"]').classList.add('active');
-    updateSplitDirectionUI();
+    const toastMsg = isEditing
+      ? '已更新這筆紀錄'
+      : `已記錄 ${currentType === 'income' ? '+' : '-'}${formatMoney(amount)} ${categoryKey}`;
+    showToast(toastMsg);
 
+    if (isEditing) {
+      exitEditMode();
+    } else {
+      el('amount').value = '';
+      el('note').value = '';
+      el('splitToggle').checked = false;
+      el('splitDetails').style.display = 'none';
+      el('splitTotal').value = '';
+      el('splitPeople').value = '';
+      el('splitName').value = '';
+      clearParticipants();
+      splitDirection = 'receivable';
+      document.querySelectorAll('.split-dir-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.split-dir-btn[data-dir="receivable"]').classList.add('active');
+      updateSplitDirectionUI();
+      el('amount').focus();
+    }
+
+    renderCategoryGrid();
     renderLedger();
-  });
+  }
 
   // ---------- Summary (current month) ----------
   function renderSummary() {
@@ -1378,6 +1667,7 @@
     filtered.forEach(r => {
       const item = document.createElement('div');
       item.className = 'history-item';
+      item.style.cursor = 'pointer';
       const noteHtml = r.note ? `<div class="history-note">${escapeHtml(r.note)}</div>` : '';
       const splitBadge = r.split ? '<span class="split-badge">🤝 分帳</span>' : '';
       const splitLine = r.split ? renderSplitLine(r.split) : '';
@@ -1392,11 +1682,13 @@
         <div class="history-amount ${r.type}">${r.type === 'income' ? '+' : '-'}${formatMoney(r.amount)}</div>
         <button class="delete-btn" data-id="${r.id}" aria-label="刪除">✕</button>
       `;
+      item.addEventListener('click', () => enterEditMode(r));
       list.appendChild(item);
     });
 
     list.querySelectorAll('.delete-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.dataset.id;
         records = records.filter(r => r.id !== id);
         saveRecords();
@@ -2165,28 +2457,64 @@
     };
   }
 
-  el('exportBtn').addEventListener('click', async () => {
+  async function doExportBackup() {
     const json = JSON.stringify(buildBackup(), null, 2);
     const filename = `簡約記帳備份_${todayStr()}.json`;
     const file = new File([json], filename, { type: 'application/json' });
+    let shared = false;
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: '記帳備份' });
-        return;
+        shared = true;
       } catch (e) {
         // user cancelled or share failed, fall through to direct download
       }
     }
 
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    if (!shared) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    localStorage.setItem(LAST_BACKUP_KEY, String(Date.now()));
+    checkBackupReminder();
+  }
+
+  el('exportBtn').addEventListener('click', doExportBackup);
+
+  // ---------- Backup reminder ----------
+  function checkBackupReminder() {
+    const today = todayStr();
+    if (localStorage.getItem(REMINDER_DISMISSED_KEY) === today) {
+      el('backupBanner').style.display = 'none';
+      return;
+    }
+
+    const lastRaw = localStorage.getItem(LAST_BACKUP_KEY);
+    const last = lastRaw ? parseInt(lastRaw, 10) : null;
+    const daysSince = last ? (Date.now() - last) / (1000 * 60 * 60 * 24) : Infinity;
+
+    if (daysSince > 7) {
+      el('backupBannerText').textContent = last
+        ? `已超過 ${Math.floor(daysSince)} 天未備份，建議立即匯出`
+        : '尚未備份過資料，建議立即匯出';
+      el('backupBanner').style.display = 'flex';
+    } else {
+      el('backupBanner').style.display = 'none';
+    }
+  }
+
+  el('backupNowBtn').addEventListener('click', doExportBackup);
+  el('backupLaterBtn').addEventListener('click', () => {
+    localStorage.setItem(REMINDER_DISMISSED_KEY, todayStr());
+    el('backupBanner').style.display = 'none';
   });
 
   el('importBtn').addEventListener('click', () => el('importFile').click());
@@ -2304,6 +2632,14 @@
   el('splitFieldWrap').style.display = currentType === 'expense' ? 'block' : 'none';
   renderLedger();
   renderSettingsSummary();
+  checkBackupReminder();
+  el('amount').focus();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
 })();
 </script>
 
