@@ -1340,7 +1340,7 @@
     moreItem.appendChild(moreBtn);
     grid.appendChild(moreItem);
 
-    sorted.forEach(cat => {
+    sorted.slice(TOP_N).forEach(cat => {
       moreGrid.appendChild(makeCategoryItem(cat, !defaultKeys.has(cat.key), (key) => commitQuickEntry(key)));
     });
 
