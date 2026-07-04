@@ -1,4 +1,4 @@
-const CACHE_NAME = 'savemoney-shell-v1';
+const CACHE_NAME = 'savemoney-shell-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -28,10 +28,25 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
   if (event.request.method !== 'GET') return;
 
+  const isAppShellDoc = event.request.mode === 'navigate' || event.request.destination === 'document';
+
+  if (isAppShellDoc) {
+    // Network-first for the app HTML itself, so updates are picked up
+    // immediately whenever the phone is online. Falls back to cache offline.
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (manifest, icons) that rarely change.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).catch(() => caches.match('./index.html'));
-    })
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
 });
