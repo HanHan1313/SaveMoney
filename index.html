@@ -1978,7 +1978,7 @@
       line.className = 'csv-row';
       const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
       line.innerHTML = `
-        <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? 'checked' : 'disabled'}>
+        <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'}>
         <div class="csv-info">
           <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}${warn}</div>
           <div class="csv-date">${row.date || '日期無法辨識'}</div>
