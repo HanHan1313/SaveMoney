@@ -756,6 +756,40 @@
     color: var(--sub-text);
     border-color: var(--sub-text);
   }
+
+  /* ---- Pagination ---- */
+  .pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 14px;
+  }
+  .pagination button {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .pagination button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .pagination button:disabled {
+    opacity: 0.4;
+  }
+  .pagination .ellipsis {
+    padding: 0 4px;
+    color: var(--sub-text);
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -910,6 +944,7 @@
         <select id="filterMonth"></select>
       </div>
       <div id="historyList"></div>
+      <div class="pagination" id="historyPagination"></div>
     </div>
   </div>
 
@@ -1067,6 +1102,9 @@
   let splitDirection = 'receivable';
   let csvRows = [];
   let editingRecordId = null;
+  let historyPage = 1;
+  let csvPage = 1;
+  let csvCheckedIndices = new Set();
   const expandedMonths = new Set();
 
   const el = (id) => document.getElementById(id);
@@ -1101,6 +1139,40 @@
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function renderPaginationControls(container, page, totalPages, onChange) {
+    container.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    function addBtn(label, targetPage, opts) {
+      opts = opts || {};
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = label;
+      if (opts.active) btn.className = 'active';
+      if (opts.disabled) btn.disabled = true;
+      btn.addEventListener('click', () => onChange(targetPage));
+      container.appendChild(btn);
+    }
+
+    addBtn('‹', page - 1, { disabled: page <= 1 });
+
+    const shown = new Set([1, totalPages, page - 1, page, page + 1]);
+    let prevShown = 0;
+    for (let p = 1; p <= totalPages; p++) {
+      if (!shown.has(p)) continue;
+      if (p - prevShown > 1) {
+        const ellipsis = document.createElement('span');
+        ellipsis.className = 'ellipsis';
+        ellipsis.textContent = '…';
+        container.appendChild(ellipsis);
+      }
+      addBtn(String(p), p, { active: p === page });
+      prevShown = p;
+    }
+
+    addBtn('›', page + 1, { disabled: page >= totalPages });
   }
 
   function todayStr() {
@@ -1619,8 +1691,8 @@
     }
   }
 
-  el('filterType').addEventListener('change', renderHistory);
-  el('filterMonth').addEventListener('change', renderHistory);
+  el('filterType').addEventListener('change', () => { historyPage = 1; renderHistory(); });
+  el('filterMonth').addEventListener('change', () => { historyPage = 1; renderHistory(); });
 
   // ---------- History List ----------
   function categoryIcon(type, cat) {
@@ -1661,10 +1733,18 @@
       note.className = 'empty-note';
       note.textContent = '沒有符合條件的紀錄';
       list.appendChild(note);
+      el('historyPagination').innerHTML = '';
       return;
     }
 
-    filtered.forEach(r => {
+    const PAGE_SIZE = 20;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (historyPage > totalPages) historyPage = totalPages;
+    if (historyPage < 1) historyPage = 1;
+    const startIdx = (historyPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + PAGE_SIZE);
+
+    pageItems.forEach(r => {
       const item = document.createElement('div');
       item.className = 'history-item';
       item.style.cursor = 'pointer';
@@ -1694,6 +1774,11 @@
         saveRecords();
         renderLedger();
       });
+    });
+
+    renderPaginationControls(el('historyPagination'), historyPage, totalPages, (p) => {
+      historyPage = p;
+      renderHistory();
     });
   }
 
@@ -1957,6 +2042,8 @@
     reader.onload = (ev) => {
       const text = decodeCsvBuffer(ev.target.result);
       csvRows = parseCSV(text);
+      csvCheckedIndices = new Set();
+      csvPage = 1;
       renderCsvPreview();
     };
     reader.readAsArrayBuffer(file);
@@ -1972,50 +2059,80 @@
       return;
     }
 
+    const PAGE_SIZE = 20;
+    const totalPages = Math.max(1, Math.ceil(csvRows.length / PAGE_SIZE));
+    if (csvPage > totalPages) csvPage = totalPages;
+    if (csvPage < 1) csvPage = 1;
+    const startIdx = (csvPage - 1) * PAGE_SIZE;
+    const pageRows = csvRows.slice(startIdx, startIdx + PAGE_SIZE);
+
+    const summary = document.createElement('div');
+    summary.className = 'ocr-note';
+    function updateSummary() {
+      summary.textContent = `共 ${csvRows.length} 筆，已勾選 ${csvCheckedIndices.size} 筆(第 ${csvPage}/${totalPages} 頁)`;
+    }
+    updateSummary();
+    wrap.appendChild(summary);
+
     const list = document.createElement('div');
-    csvRows.forEach((row, idx) => {
+    pageRows.forEach((row, i) => {
+      const idx = startIdx + i;
       const line = document.createElement('div');
       line.className = 'csv-row';
       const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
       line.innerHTML = `
-        <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'}>
+        <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'} ${csvCheckedIndices.has(idx) ? 'checked' : ''}>
         <div class="csv-info">
           <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}${warn}</div>
           <div class="csv-date">${row.date || '日期無法辨識'}</div>
         </div>
         <div class="csv-amount" style="color:${row.amount < 0 ? 'var(--income)' : 'var(--expense)'}">${isNaN(row.amount) ? '-' : formatMoney(row.amount)}</div>
       `;
+      line.querySelector('.csv-check').addEventListener('change', (ev) => {
+        if (ev.target.checked) csvCheckedIndices.add(idx); else csvCheckedIndices.delete(idx);
+        updateSummary();
+      });
       list.appendChild(line);
     });
     wrap.appendChild(list);
 
+    const paginationWrap = document.createElement('div');
+    paginationWrap.className = 'pagination';
+    wrap.appendChild(paginationWrap);
+    renderPaginationControls(paginationWrap, csvPage, totalPages, (p) => {
+      csvPage = p;
+      renderCsvPreview();
+    });
+
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;gap:10px;margin-top:14px;';
     actions.innerHTML = `
-      <button type="button" class="submit-btn" id="csvConfirmBtn" style="flex:1;">確認匯入</button>
+      <button type="button" class="submit-btn" id="csvConfirmBtn" style="flex:1;">確認匯入已勾選項目</button>
       <button type="button" class="submit-btn btn-outline" id="csvCancelBtn" style="flex:1;">取消</button>
     `;
     wrap.appendChild(actions);
 
     el('csvConfirmBtn').addEventListener('click', confirmCsvImport);
-    el('csvCancelBtn').addEventListener('click', () => { csvRows = []; wrap.innerHTML = ''; });
+    el('csvCancelBtn').addEventListener('click', () => {
+      csvRows = [];
+      csvCheckedIndices = new Set();
+      csvPage = 1;
+      wrap.innerHTML = '';
+    });
   }
 
   function confirmCsvImport() {
     const globalType = el('csvType').value;
     const globalCategory = el('csvCategory').value;
-    const checks = document.querySelectorAll('.csv-check');
     let count = 0;
 
-    checks.forEach((chk, n) => {
-      if (!chk.checked) return;
-      const idx = parseInt(chk.dataset.idx, 10);
+    csvCheckedIndices.forEach((idx) => {
       const row = csvRows[idx];
       if (!row || !row.valid) return;
       const flip = row.amount < 0;
       const type = flip ? (globalType === 'expense' ? 'income' : 'expense') : globalType;
       const record = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + n,
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + count,
         type,
         category: globalCategory,
         amount: Math.abs(row.amount),
@@ -2028,6 +2145,8 @@
 
     saveRecords();
     csvRows = [];
+    csvCheckedIndices = new Set();
+    csvPage = 1;
     el('csvPreview').innerHTML = `<div class="empty-note">已成功匯入 ${count} 筆紀錄</div>`;
     renderLedger();
   }
