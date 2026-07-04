@@ -1936,15 +1936,30 @@
   }
 
   el('csvImportBtn').addEventListener('click', () => el('csvFile').click());
+  function decodeCsvBuffer(buffer) {
+    // Taiwanese bank CSV exports are very often Big5, not UTF-8.
+    // Try strict UTF-8 first; if it's not valid UTF-8, fall back to Big5.
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    } catch (e) {
+      try {
+        return new TextDecoder('big5').decode(buffer);
+      } catch (e2) {
+        return new TextDecoder('utf-8').decode(buffer);
+      }
+    }
+  }
+
   el('csvFile').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      csvRows = parseCSV(ev.target.result);
+      const text = decodeCsvBuffer(ev.target.result);
+      csvRows = parseCSV(text);
       renderCsvPreview();
     };
-    reader.readAsText(file, 'utf-8');
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   });
 
