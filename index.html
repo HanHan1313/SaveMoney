@@ -209,6 +209,38 @@
     color: var(--accent);
     border-color: var(--accent);
   }
+  .cat-add-item.expanded {
+    grid-column: 1 / -1;
+  }
+  .cat-add-form {
+    display: flex;
+    gap: 6px;
+  }
+  .cat-add-form input {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .cat-add-form button {
+    flex-shrink: 0;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .cat-add-form .cat-add-confirm {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
   .cat-remove {
     position: absolute;
     top: -6px;
@@ -1313,28 +1345,59 @@
     });
 
     const addItem = document.createElement('div');
-    addItem.className = 'cat-item';
+    addItem.className = 'cat-item cat-add-item';
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'category-btn add-btn';
     addBtn.textContent = '+ 新增';
-    addBtn.addEventListener('click', () => {
-      const name = prompt('輸入新類別名稱：');
-      if (!name) return;
-      const trimmed = name.trim();
-      if (!trimmed) return;
+
+    const addForm = document.createElement('div');
+    addForm.className = 'cat-add-form';
+    addForm.style.display = 'none';
+    addForm.innerHTML = `
+      <input type="text" class="cat-add-input" placeholder="新類別名稱" maxlength="10">
+      <button type="button" class="cat-add-confirm">新增</button>
+      <button type="button" class="cat-add-cancel">取消</button>
+    `;
+    const addInput = addForm.querySelector('.cat-add-input');
+    const addConfirmBtn = addForm.querySelector('.cat-add-confirm');
+    const addCancelBtn = addForm.querySelector('.cat-add-cancel');
+
+    function submitNewCategory() {
+      const trimmed = addInput.value.trim();
+      if (!trimmed) { addInput.focus(); return; }
       if (sorted.find(c => c.key === trimmed)) {
-        alert('這個類別已經存在');
+        showToast('這個類別已經存在');
         return;
       }
       customCategories[currentType] = customCategories[currentType] || [];
       customCategories[currentType].push({ key: trimmed, icon: '🏷️' });
       saveCustomCategories();
       currentCategory = trimmed;
+      showToast(`已新增類別「${trimmed}」`);
       renderCategoryGrid();
-      moreGrid.style.display = 'grid';
+      el('categoryGridMore').style.display = 'grid';
+    }
+
+    addBtn.addEventListener('click', () => {
+      addBtn.style.display = 'none';
+      addForm.style.display = 'flex';
+      addItem.classList.add('expanded');
+      addInput.focus();
     });
+    addConfirmBtn.addEventListener('click', submitNewCategory);
+    addCancelBtn.addEventListener('click', () => {
+      addForm.style.display = 'none';
+      addBtn.style.display = 'block';
+      addItem.classList.remove('expanded');
+      addInput.value = '';
+    });
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitNewCategory(); }
+    });
+
     addItem.appendChild(addBtn);
+    addItem.appendChild(addForm);
     moreGrid.appendChild(addItem);
 
     populateCsvCategories();
