@@ -346,6 +346,17 @@
   .history-amount { font-size: 16px; font-weight: 700; margin-right: 10px; white-space: nowrap; }
   .history-amount.income { color: var(--income); }
   .history-amount.expense { color: var(--expense); }
+  .csv-warn-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 8px;
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+  .csv-warn-badge.duplicate { background: rgba(255,149,0,0.15); color: #ff9500; }
+  .csv-warn-badge.invalid { background: rgba(255,59,48,0.12); color: var(--expense); }
   .split-badge {
     display: inline-block;
     font-size: 10px;
@@ -2895,9 +2906,8 @@
 
       const line = document.createElement('div');
       line.className = 'csv-row';
-      const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
-      const dupWarn = row.valid && row.duplicate ? '<div style="color:#ff9500; font-size:12px; margin-top:2px;">⚠️ 疑似重複</div>' : '';
-      const invalidWarn = warn ? `<div style="color:var(--expense); font-size:12px; margin-top:2px;">${warn.trim()}</div>` : '';
+      const dupWarn = row.valid && row.duplicate ? '<div><span class="csv-warn-badge duplicate">⚠️ 疑似重複</span></div>' : '';
+      const invalidWarn = !row.valid ? '<div><span class="csv-warn-badge invalid">⚠️ 格式無法辨識</span></div>' : '';
       const splitActive = row.splitConfig && row.splitConfig.enabled;
       line.innerHTML = `
         <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'} ${csvCheckedIndices.has(idx) ? 'checked' : ''}>
