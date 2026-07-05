@@ -2896,13 +2896,16 @@
       const line = document.createElement('div');
       line.className = 'csv-row';
       const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
-      const dupWarn = row.valid && row.duplicate ? ' <span style="color:#ff9500">⚠️ 疑似重複</span>' : '';
+      const dupWarn = row.valid && row.duplicate ? '<div style="color:#ff9500; font-size:12px; margin-top:2px;">⚠️ 疑似重複</div>' : '';
+      const invalidWarn = warn ? `<div style="color:var(--expense); font-size:12px; margin-top:2px;">${warn.trim()}</div>` : '';
       const splitActive = row.splitConfig && row.splitConfig.enabled;
       line.innerHTML = `
         <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'} ${csvCheckedIndices.has(idx) ? 'checked' : ''}>
         <div class="csv-info">
-          <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}${warn}${dupWarn}</div>
+          <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}</div>
           <div class="csv-date">${row.date || '日期無法辨識'}</div>
+          ${invalidWarn}
+          ${dupWarn}
         </div>
         <div class="csv-amount" style="color:${row.amount < 0 ? 'var(--income)' : 'var(--expense)'}">${isNaN(row.amount) ? '-' : formatMoney(row.amount)}</div>
         ${row.valid ? `<button type="button" class="csv-split-btn${splitActive ? ' active' : ''}" title="設定分帳">🤝</button>` : ''}
