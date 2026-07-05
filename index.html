@@ -734,6 +734,13 @@
     flex-direction: column;
     gap: 10px;
   }
+  .backup-banner.danger {
+    background: #ffebee;
+    border-color: #ffb3ba;
+  }
+  .backup-banner.danger .backup-banner-text {
+    color: var(--expense);
+  }
   .backup-banner-text {
     font-size: 13px;
     color: #b25e00;
@@ -920,6 +927,97 @@
     margin-top: 4px;
   }
 
+  /* ---- Bills ---- */
+  .bill-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .bill-card-top {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .bill-name {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .bill-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+  .bill-status-badge.paid { background: rgba(52,199,89,0.15); color: var(--income); }
+  .bill-status-badge.unpaid { background: rgba(255,59,48,0.12); color: var(--expense); }
+  .bill-status-badge.partial { background: rgba(255,149,0,0.15); color: #ff9500; }
+  .bill-status-badge.pending_amount { background: rgba(142,142,147,0.15); color: var(--sub-text); }
+  .bill-sub {
+    font-size: 13px;
+    color: var(--sub-text);
+    margin-bottom: 10px;
+    line-height: 1.6;
+  }
+  .bill-carry-warning {
+    font-size: 12px;
+    color: var(--expense);
+    margin-bottom: 10px;
+  }
+  .bill-action-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .bill-action-row input {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .bill-action-row button {
+    flex-shrink: 0;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+  }
+  .bill-history-toggle {
+    width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--sub-text);
+  }
+  .bill-history-list {
+    display: none;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .bill-history-list.open { display: block; }
+  .bill-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .bill-history-item:last-child { border-bottom: none; }
+
   /* ---- Pagination ---- */
   .pagination {
     display: flex;
@@ -978,6 +1076,10 @@
         <button type="button" id="legacyMigrationExportRemove">匯出備份並移除</button>
         <button type="button" id="legacyMigrationKeep">保留不再提醒</button>
       </div>
+    </div>
+
+    <div class="backup-banner" id="billsReminderBanner" style="display:none;">
+      <div class="backup-banner-text" id="billsReminderText"></div>
     </div>
 
     <!-- Monthly Summary -->
@@ -1199,6 +1301,17 @@
     </div>
   </div>
 
+  <!-- ============ PAGE: BILLS ============ -->
+  <div class="page" id="page-bills">
+    <div class="card">
+      <h2>應繳帳單</h2>
+      <button type="button" class="submit-btn btn-outline" id="addBillTemplateBtn">+ 新增帳單類型</button>
+      <div id="addBillTemplateForm" style="display:none; margin-top:14px;"></div>
+    </div>
+
+    <div id="billCardsList"></div>
+  </div>
+
   <!-- ============ PAGE: SETTINGS ============ -->
   <div class="page" id="page-settings">
     <div class="card">
@@ -1227,6 +1340,7 @@
   <button class="nav-btn active" data-page="ledger">📒<span>記帳</span></button>
   <button class="nav-btn" data-page="report">📊<span>損益表</span></button>
   <button class="nav-btn" data-page="investment">📈<span>投資</span></button>
+  <button class="nav-btn" data-page="bills">📄<span>帳單</span></button>
   <button class="nav-btn" data-page="settings">⚙️<span>設定</span></button>
 </nav>
 
@@ -1282,6 +1396,8 @@
   let screenshots = loadJSON(SCREENSHOT_KEY, []);
   let categoryUsage = loadJSON(CATEGORY_USAGE_KEY, { expense: {}, income: {} });
   let manualDebts = loadJSON(MANUAL_DEBT_KEY, []);
+  let billTemplates = loadJSON(BILL_TEMPLATES_KEY, []);
+  let billInstances = loadJSON(BILL_INSTANCES_KEY, []);
   let currentType = 'expense';
   let currentCategory = null;
   let splitDirection = 'receivable';
@@ -1311,6 +1427,9 @@
   function saveScreenshots() { save(SCREENSHOT_KEY, screenshots); }
   function saveCategoryUsage() { save(CATEGORY_USAGE_KEY, categoryUsage); }
   function saveManualDebts() { save(MANUAL_DEBT_KEY, manualDebts); }
+  function saveBillTemplates() { save(BILL_TEMPLATES_KEY, billTemplates); }
+  function saveBillInstances() { save(BILL_INSTANCES_KEY, billInstances); }
+  function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   function bumpCategoryUsage(type, key) {
     categoryUsage[type] = categoryUsage[type] || {};
@@ -1402,6 +1521,7 @@
       if (btn.dataset.page === 'report') renderReport();
       if (btn.dataset.page === 'investment') renderInvestments();
       if (btn.dataset.page === 'settings') renderSettingsSummary();
+      if (btn.dataset.page === 'bills') renderBillsPage();
     });
   });
 
@@ -3539,6 +3659,359 @@
     renderSettingsSummary();
   });
 
+  // ================= BILLS (功能二) =================
+  function computeDueDate(ym, day) {
+    const [y, m] = ym.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const d = Math.min(day, lastDay);
+    return `${ym}-${String(d).padStart(2, '0')}`;
+  }
+
+  function billTotalDue(inst) {
+    return Math.round(((inst.billedAmount || 0) + (inst.carriedOver || 0)) * 100) / 100;
+  }
+  function billPaidAmount(inst) {
+    return Math.round((inst.payments || []).reduce((s, p) => s + p.amount, 0) * 100) / 100;
+  }
+  function billRemaining(inst) {
+    return Math.round((billTotalDue(inst) - billPaidAmount(inst)) * 100) / 100;
+  }
+
+  function generateBillInstancesIfNeeded() {
+    const todayYm = todayStr().slice(0, 7);
+    let changed = false;
+
+    billTemplates.forEach(tpl => {
+      if (!tpl.active) return;
+      const existing = billInstances.find(inst => inst.templateId === tpl.id && inst.period === todayYm);
+      if (existing) return;
+
+      const priorInstances = billInstances
+        .filter(inst => inst.templateId === tpl.id && inst.period < todayYm && !inst.closed)
+        .sort((a, b) => b.period.localeCompare(a.period));
+
+      let carriedOver = 0;
+      priorInstances.forEach(inst => {
+        const shortfall = billRemaining(inst);
+        const isPastDue = inst.dueDate < todayStr();
+        if (isPastDue && shortfall > 0.005 && (inst.status === 'unpaid' || inst.status === 'partial')) {
+          carriedOver = Math.round((carriedOver + shortfall) * 100) / 100;
+        }
+        inst.closed = true;
+      });
+
+      const dueDate = computeDueDate(todayYm, tpl.dueDay);
+      const billedAmount = tpl.amountType === 'fixed' ? tpl.defaultAmount : null;
+      const status = (tpl.amountType === 'variable' && billedAmount === null) ? 'pending_amount' : 'unpaid';
+
+      billInstances.push({
+        id: genId(),
+        templateId: tpl.id,
+        period: todayYm,
+        dueDate,
+        billedAmount,
+        carriedOver,
+        payments: [],
+        status,
+        closed: false
+      });
+      changed = true;
+    });
+
+    if (changed) saveBillInstances();
+  }
+
+  function setBillAmount(instanceId, amount) {
+    const inst = billInstances.find(i => i.id === instanceId);
+    if (!inst) return;
+    inst.billedAmount = amount;
+    inst.status = 'unpaid';
+    saveBillInstances();
+    renderBillsPage();
+    checkBillsReminder();
+  }
+
+  function recordBillPayment(instanceId, amount) {
+    const inst = billInstances.find(i => i.id === instanceId);
+    if (!inst) return;
+    const tpl = billTemplates.find(t => t.id === inst.templateId);
+    if (!tpl) return;
+
+    const remaining = billRemaining(inst);
+    const applied = Math.round(Math.min(Math.max(amount, 0), remaining) * 100) / 100;
+    if (applied <= 0) return;
+
+    let recordId = null;
+    if (tpl.createExpenseRecord) {
+      const rec = {
+        id: genId(),
+        type: 'expense',
+        category: tpl.category || '其他',
+        amount: applied,
+        date: todayStr(),
+        note: `${tpl.name} 繳費`
+      };
+      records.push(rec);
+      recordId = rec.id;
+      saveRecords();
+    }
+
+    inst.payments = inst.payments || [];
+    inst.payments.push({ date: todayStr(), amount: applied, recordId });
+
+    const newPaid = billPaidAmount(inst);
+    const totalDue = billTotalDue(inst);
+    inst.status = newPaid >= totalDue - 0.005 ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
+    saveBillInstances();
+    showToast(`已記錄繳費 ${formatMoney(applied)}`);
+    renderBillsPage();
+    checkBillsReminder();
+    if (tpl.createExpenseRecord) renderLedger();
+  }
+
+  function deleteBillPayment(instanceId, paymentIndex) {
+    const inst = billInstances.find(i => i.id === instanceId);
+    if (!inst) return;
+    const payment = inst.payments[paymentIndex];
+    if (!payment) return;
+    if (!confirm('刪除這筆繳費紀錄？')) return;
+
+    if (payment.recordId) {
+      records = records.filter(r => r.id !== payment.recordId);
+      saveRecords();
+    }
+    inst.payments.splice(paymentIndex, 1);
+
+    const tpl = billTemplates.find(t => t.id === inst.templateId);
+    const paid = billPaidAmount(inst);
+    const totalDue = billTotalDue(inst);
+    if (paid >= totalDue - 0.005 && totalDue > 0) inst.status = 'paid';
+    else if (paid > 0) inst.status = 'partial';
+    else inst.status = (tpl && tpl.amountType === 'variable' && inst.billedAmount === null) ? 'pending_amount' : 'unpaid';
+
+    saveBillInstances();
+    renderBillsPage();
+    checkBillsReminder();
+    renderLedger();
+  }
+
+  function checkBillsReminder() {
+    const todayYm = todayStr().slice(0, 7);
+    const unpaidThisMonth = billInstances.filter(inst => inst.period === todayYm && inst.status !== 'paid');
+    const banner = el('billsReminderBanner');
+    if (unpaidThisMonth.length === 0) {
+      banner.style.display = 'none';
+      return;
+    }
+    const total = Math.round(unpaidThisMonth.reduce((s, i) => s + billRemaining(i), 0) * 100) / 100;
+    const overdue = unpaidThisMonth.some(i => i.dueDate < todayStr());
+    banner.classList.toggle('danger', overdue);
+    el('billsReminderText').textContent = `📄 本月未繳 ${unpaidThisMonth.length} 筆(合計 ${formatMoney(total)})${overdue ? '，已有逾期帳單' : ''}`;
+    banner.style.display = 'flex';
+  }
+
+  function statusLabel(status) {
+    return { paid: '已繳', unpaid: '未繳', partial: '部分繳納', pending_amount: '待填金額' }[status] || status;
+  }
+
+  function renderBillsPage() {
+    const wrap = el('billCardsList');
+    wrap.innerHTML = '';
+
+    if (billTemplates.length === 0) {
+      wrap.innerHTML = '<div class="empty-note">尚未設定任何帳單類型</div>';
+      return;
+    }
+
+    const todayYm = todayStr().slice(0, 7);
+
+    billTemplates.forEach(tpl => {
+      const inst = billInstances.find(i => i.templateId === tpl.id && i.period === todayYm);
+      if (!inst) return;
+
+      const card = document.createElement('div');
+      card.className = 'bill-card';
+
+      const totalDue = billTotalDue(inst);
+      const paid = billPaidAmount(inst);
+      const remaining = billRemaining(inst);
+      const carryWarning = tpl.amountType === 'variable' && inst.carriedOver > 0
+        ? `<div class="bill-carry-warning">⚠️ 含上期未繳 ${formatMoney(inst.carriedOver)} 滾入，請留意循環利息</div>` : '';
+      const statementDue = tpl.statementDay != null ? computeDueDate(inst.period, tpl.statementDay) : null;
+      const statementWarning = (inst.status === 'pending_amount' && statementDue && todayStr() > statementDue)
+        ? `<div class="bill-carry-warning">⏰ 已過結帳日(${statementDue})，該填入本期帳單金額了</div>` : '';
+
+      card.innerHTML = `
+        <div class="bill-card-top">
+          <div class="bill-name">${escapeHtml(tpl.name)}</div>
+          <div class="bill-status-badge ${inst.status}">${statusLabel(inst.status)}</div>
+        </div>
+        <div class="bill-sub">
+          ${inst.billedAmount === null ? '本期帳單：待填金額' : `本期帳單 ${formatMoney(inst.billedAmount)}${inst.carriedOver > 0 ? ' + 上期未繳 ' + formatMoney(inst.carriedOver) : ''} = 應繳 ${formatMoney(totalDue)}`}
+          ・已繳 ${formatMoney(paid)} ・截止 ${inst.dueDate}
+        </div>
+        ${carryWarning}
+        ${statementWarning}
+      `;
+
+      if (inst.status === 'pending_amount') {
+        const row = document.createElement('div');
+        row.className = 'bill-action-row';
+        row.innerHTML = `
+          <input type="number" class="bill-fill-amount" placeholder="輸入本期帳單金額" min="0" step="0.01">
+          <button type="button" class="bill-fill-btn">確認金額</button>
+        `;
+        row.querySelector('.bill-fill-btn').addEventListener('click', () => {
+          const amt = parseFloat(row.querySelector('.bill-fill-amount').value);
+          if (!amt || amt <= 0) { showToast('請輸入金額'); return; }
+          setBillAmount(inst.id, amt);
+        });
+        card.appendChild(row);
+      } else if (inst.status !== 'paid') {
+        const row = document.createElement('div');
+        row.className = 'bill-action-row';
+        row.innerHTML = `
+          <input type="number" class="bill-pay-amount" min="0" step="0.01" value="${remaining}">
+          <button type="button" class="bill-pay-btn">繳費</button>
+        `;
+        row.querySelector('.bill-pay-btn').addEventListener('click', () => {
+          const amt = parseFloat(row.querySelector('.bill-pay-amount').value);
+          if (!amt || amt <= 0) { showToast('請輸入繳費金額'); return; }
+          recordBillPayment(inst.id, amt);
+        });
+        card.appendChild(row);
+      }
+
+      const historyBtn = document.createElement('button');
+      historyBtn.type = 'button';
+      historyBtn.className = 'bill-history-toggle';
+      historyBtn.textContent = '📜 歷史各期';
+      const historyList = document.createElement('div');
+      historyList.className = 'bill-history-list';
+
+      historyBtn.addEventListener('click', () => {
+        historyList.classList.toggle('open');
+        if (!historyList.classList.contains('open')) return;
+        historyList.innerHTML = '';
+        const pastInstances = billInstances
+          .filter(i => i.templateId === tpl.id)
+          .sort((a, b) => b.period.localeCompare(a.period));
+        pastInstances.forEach(pi => {
+          const item = document.createElement('div');
+          item.className = 'bill-history-item';
+          item.innerHTML = `<span>${pi.period}・應繳${formatMoney(billTotalDue(pi))}</span><span>${statusLabel(pi.status)}・已繳${formatMoney(billPaidAmount(pi))}</span>`;
+          historyList.appendChild(item);
+          (pi.payments || []).forEach((p, pIdx) => {
+            const pRow = document.createElement('div');
+            pRow.className = 'bill-history-item';
+            pRow.style.paddingLeft = '12px';
+            pRow.innerHTML = `<span>　${p.date} 繳費 ${formatMoney(p.amount)}</span><span></span>`;
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.textContent = '🗑️';
+            delBtn.style.cssText = 'border:none;background:none;font-size:12px;';
+            delBtn.addEventListener('click', () => deleteBillPayment(pi.id, pIdx));
+            pRow.lastElementChild.appendChild(delBtn);
+            historyList.appendChild(pRow);
+          });
+        });
+      });
+
+      card.appendChild(historyBtn);
+      card.appendChild(historyList);
+      wrap.appendChild(card);
+    });
+  }
+
+  el('addBillTemplateBtn').addEventListener('click', () => {
+    const formWrap = el('addBillTemplateForm');
+    if (formWrap.style.display === 'block') {
+      formWrap.style.display = 'none';
+      return;
+    }
+    const expenseCats = getCategories('expense');
+    formWrap.innerHTML = `
+      <div class="field">
+        <label>帳單名稱</label>
+        <input type="text" id="billTplName" placeholder="例如：台新信用卡">
+      </div>
+      <div class="type-toggle" id="billTplAmountType">
+        <button type="button" class="active" data-type="fixed">固定金額</button>
+        <button type="button" data-type="variable">每期填寫(如信用卡)</button>
+      </div>
+      <div class="field" id="billTplDefaultAmountWrap">
+        <label>每期金額</label>
+        <input type="number" id="billTplDefaultAmount" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="field">
+        <label>繳款截止日(每月第幾天，1-31)</label>
+        <input type="number" id="billTplDueDay" min="1" max="31" placeholder="例如 15">
+      </div>
+      <div class="field">
+        <label>結帳日(選填，僅提醒填金額用)</label>
+        <input type="number" id="billTplStatementDay" min="1" max="31" placeholder="例如 5">
+      </div>
+      <div class="field">
+        <label class="checkbox-label">
+          <input type="checkbox" id="billTplCreateExpense">
+          繳費時同步建立支出紀錄(信用卡帳單請勿勾選，避免消費被重複計算)
+        </label>
+      </div>
+      <div class="field" id="billTplCategoryWrap" style="display:none;">
+        <label>支出類別</label>
+        <select id="billTplCategory">${expenseCats.map(c => `<option value="${escapeHtml(c.key)}">${c.icon} ${escapeHtml(c.key)}</option>`).join('')}</select>
+      </div>
+      <button type="button" class="submit-btn" id="billTplSubmitBtn">新增帳單類型</button>
+    `;
+
+    let amountType = 'fixed';
+    formWrap.querySelectorAll('#billTplAmountType button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        formWrap.querySelectorAll('#billTplAmountType button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        amountType = btn.dataset.type;
+        el('billTplDefaultAmountWrap').style.display = amountType === 'fixed' ? 'block' : 'none';
+      });
+    });
+    el('billTplCreateExpense').addEventListener('change', () => {
+      el('billTplCategoryWrap').style.display = el('billTplCreateExpense').checked ? 'block' : 'none';
+    });
+
+    el('billTplSubmitBtn').addEventListener('click', () => {
+      const name = el('billTplName').value.trim();
+      const dueDay = parseInt(el('billTplDueDay').value, 10);
+      const statementDayRaw = el('billTplStatementDay').value;
+      const statementDay = statementDayRaw ? parseInt(statementDayRaw, 10) : null;
+      const createExpenseRecord = el('billTplCreateExpense').checked;
+      const category = createExpenseRecord ? el('billTplCategory').value : null;
+      const defaultAmount = amountType === 'fixed' ? parseFloat(el('billTplDefaultAmount').value) : 0;
+
+      if (!name) { showToast('請輸入帳單名稱'); return; }
+      if (!dueDay || dueDay < 1 || dueDay > 31) { showToast('請輸入正確的繳款截止日(1-31)'); return; }
+      if (amountType === 'fixed' && (!defaultAmount || defaultAmount <= 0)) { showToast('請輸入每期金額'); return; }
+
+      billTemplates.push({
+        id: genId(),
+        name,
+        amountType,
+        defaultAmount: amountType === 'fixed' ? defaultAmount : 0,
+        dueDay,
+        statementDay,
+        category,
+        createExpenseRecord,
+        active: true
+      });
+      saveBillTemplates();
+      generateBillInstancesIfNeeded();
+      showToast(`已新增帳單類型「${name}」`);
+      formWrap.style.display = 'none';
+      renderBillsPage();
+      checkBillsReminder();
+    });
+
+    formWrap.style.display = 'block';
+  });
+
   // ---------- Init ----------
   renderCategoryGrid();
   el('splitFieldWrap').style.display = currentType === 'expense' ? 'block' : 'none';
@@ -3546,6 +4019,8 @@
   renderSettingsSummary();
   checkBackupReminder();
   checkLegacySplitIncomeMigration();
+  generateBillInstancesIfNeeded();
+  checkBillsReminder();
   el('amount').focus();
 
   if ('serviceWorker' in navigator) {
