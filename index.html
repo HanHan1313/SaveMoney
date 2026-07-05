@@ -828,6 +828,98 @@
     border-color: var(--sub-text);
   }
 
+  /* ---- Person aggregate (split) ---- */
+  .split-detail-heading {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--sub-text);
+    margin: 18px 0 10px;
+  }
+  .person-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .person-card-top {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  .person-card-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .person-card-net {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .person-card-sub {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-top: 4px;
+  }
+  .person-card-detail {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .person-card-detail.open { display: block; }
+  .person-detail-group-title {
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-bottom: 6px;
+  }
+  .person-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .person-detail-item:last-child { border-bottom: none; }
+  .repay-row {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .repay-row input {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .repay-row button {
+    flex-shrink: 0;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+  }
+  .settle-all-btn {
+    width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    margin-top: 4px;
+  }
+
   /* ---- Pagination ---- */
   .pagination {
     display: flex;
@@ -877,6 +969,14 @@
       <div class="backup-banner-actions">
         <button type="button" id="backupNowBtn">立即備份</button>
         <button type="button" id="backupLaterBtn">稍後</button>
+      </div>
+    </div>
+
+    <div class="backup-banner" id="legacyMigrationBanner" style="display:none;">
+      <div class="backup-banner-text" id="legacyMigrationText"></div>
+      <div class="backup-banner-actions">
+        <button type="button" id="legacyMigrationExportRemove">匯出備份並移除</button>
+        <button type="button" id="legacyMigrationKeep">保留不再提醒</button>
       </div>
     </div>
 
@@ -996,6 +1096,14 @@
     <!-- Split overview -->
     <div class="card split-section">
       <h2>分帳總覽</h2>
+      <div class="summary-grid" id="splitSummary"></div>
+
+      <button type="button" class="submit-btn btn-outline" id="addDebtBtn" style="margin:14px 0 0;">+ 新增欠款(不綁消費)</button>
+      <div id="addDebtForm" style="display:none; margin-top:12px;"></div>
+
+      <div id="personAggregateList" style="margin-top:14px;"></div>
+
+      <div class="split-detail-heading">全部明細</div>
       <div class="split-tabs" id="splitTabs">
         <button type="button" class="active" data-tab="pending">待結</button>
         <button type="button" data-tab="settled">已結清</button>
@@ -1142,6 +1250,8 @@
   const CATEGORY_USAGE_KEY = 'expenseTrackerCategoryUsage';
   const LAST_BACKUP_KEY = 'expenseTrackerLastBackupAt';
   const REMINDER_DISMISSED_KEY = 'expenseTrackerReminderDismissedDate';
+  const MANUAL_DEBT_KEY = 'expenseTrackerManualDebts';
+  const LEGACY_SPLIT_INCOME_HANDLED_KEY = 'expenseTrackerLegacySplitIncomeHandled';
 
   const DEFAULT_CATEGORIES = {
     expense: [
@@ -1169,6 +1279,7 @@
   let investments = loadJSON(INVEST_KEY, []);
   let screenshots = loadJSON(SCREENSHOT_KEY, []);
   let categoryUsage = loadJSON(CATEGORY_USAGE_KEY, { expense: {}, income: {} });
+  let manualDebts = loadJSON(MANUAL_DEBT_KEY, []);
   let currentType = 'expense';
   let currentCategory = null;
   let splitDirection = 'receivable';
@@ -1197,6 +1308,7 @@
   function saveInvestments() { save(INVEST_KEY, investments); }
   function saveScreenshots() { save(SCREENSHOT_KEY, screenshots); }
   function saveCategoryUsage() { save(CATEGORY_USAGE_KEY, categoryUsage); }
+  function saveManualDebts() { save(MANUAL_DEBT_KEY, manualDebts); }
 
   function bumpCategoryUsage(type, key) {
     categoryUsage[type] = categoryUsage[type] || {};
@@ -1643,8 +1755,8 @@
             id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
             name: p.name,
             amount: p.amount,
-            status: 'pending',
-            settledRecordId: null
+            paidAmount: 0,
+            status: 'pending'
           }))
         };
       } else {
@@ -1653,6 +1765,7 @@
           totalAmount: total,
           counterpartAmount: remainder,
           counterpartName: el('splitName').value.trim(),
+          paidAmount: 0,
           status: remainder > 0 ? 'pending' : 'settled'
         };
       }
@@ -1806,13 +1919,16 @@
   function renderSplitLine(split) {
     if (split.direction === 'payable') {
       const who = split.counterpartName ? escapeHtml(split.counterpartName) : '朋友';
-      const statusLabel = split.status === 'settled' ? '已結清' : '未結清';
+      const paid = split.paidAmount || 0;
+      const statusLabel = split.status === 'settled' ? '已結清' : (paid > 0 ? `已還${formatMoney(paid)}` : '未結清');
       const color = split.status === 'settled' ? 'var(--sub-text)' : 'var(--accent)';
       return `<div class="history-split-info" style="color:${color}">總${formatMoney(split.totalAmount)}・你應付${who}${formatMoney(split.counterpartAmount)}・${statusLabel}</div>`;
     }
     const parts = (split.participants || []).map(p => {
       const name = p.name ? escapeHtml(p.name) : '朋友';
-      return `${name}${formatMoney(p.amount)}(${p.status === 'settled' ? '已收' : '未收'})`;
+      const paid = p.paidAmount || 0;
+      const statusLabel = p.status === 'settled' ? '已收' : (paid > 0 ? `已收${formatMoney(paid)}` : '未收');
+      return `${name}${formatMoney(p.amount)}(${statusLabel})`;
     }).join('、');
     const allSettled = (split.participants || []).length > 0 && split.participants.every(p => p.status === 'settled');
     const color = allSettled ? 'var(--sub-text)' : 'var(--accent)';
@@ -1885,8 +2001,9 @@
     });
   }
 
-  // ---------- Split overview ----------
+  // ---------- Split overview (unified ledger items: record splits + manual debts) ----------
   let splitTab = 'pending';
+  const openPersonCards = new Set();
 
   document.querySelectorAll('#splitTabs button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1897,26 +2014,249 @@
     });
   });
 
-  function collectSplitItems(statusWanted) {
+  // Settling/repaying a split or manual debt only ever changes status/paidAmount.
+  // It never creates an income or expense record: record.amount already reflects
+  // the user's actual share at entry time, so booking a second record on repayment
+  // would double count it in the P&L.
+  function collectLedgerItems() {
     const items = [];
+
     records.forEach(r => {
       if (!r.split) return;
       if (r.split.direction === 'payable') {
-        if (r.split.status === statusWanted) items.push({ record: r, kind: 'payable' });
+        const name = (r.split.counterpartName || '').trim() || '(未命名)';
+        items.push({
+          source: 'record', recordId: r.id, itemId: null,
+          name, direction: 'payable',
+          amount: r.split.counterpartAmount,
+          paidAmount: r.split.paidAmount || 0,
+          status: r.split.status,
+          date: r.date, label: r.category,
+          _ref: r.split
+        });
       } else {
         (r.split.participants || []).forEach(p => {
-          if (p.status === statusWanted) items.push({ record: r, kind: 'receivable', participant: p });
+          const name = (p.name || '').trim() || '(未命名)';
+          items.push({
+            source: 'record', recordId: r.id, itemId: p.id,
+            name, direction: 'receivable',
+            amount: p.amount,
+            paidAmount: p.paidAmount || 0,
+            status: p.status,
+            date: r.date, label: r.category,
+            _ref: p
+          });
         });
       }
     });
-    items.sort((a, b) => b.record.date.localeCompare(a.record.date));
+
+    manualDebts.forEach(d => {
+      const name = (d.name || '').trim() || '(未命名)';
+      items.push({
+        source: 'manualDebt', recordId: null, itemId: d.id,
+        name, direction: d.direction,
+        amount: d.amount,
+        paidAmount: d.paidAmount || 0,
+        status: d.status,
+        date: d.date, label: d.note || '手動欠款',
+        _ref: d
+      });
+    });
+
     return items;
   }
 
+  function remainingOf(item) {
+    return Math.round((item.amount - item.paidAmount) * 100) / 100;
+  }
+
+  function applyRepayment(item, amountToApply) {
+    const remaining = remainingOf(item);
+    const applied = Math.min(Math.max(amountToApply, 0), remaining);
+    const newPaid = Math.round((item.paidAmount + applied) * 100) / 100;
+    item._ref.paidAmount = newPaid;
+    if (newPaid >= item.amount - 0.005) {
+      item._ref.status = 'settled';
+      item._ref.paidAmount = item.amount;
+    } else {
+      item._ref.status = 'pending';
+    }
+    return applied;
+  }
+
+  function persistLedgerChanges() {
+    saveRecords();
+    saveManualDebts();
+    renderLedger();
+  }
+
+  function getPersonAggregates() {
+    const items = collectLedgerItems();
+    const map = new Map();
+
+    items.forEach(item => {
+      if (!map.has(item.name)) {
+        map.set(item.name, { name: item.name, pendingReceivable: 0, pendingPayable: 0, pendingCount: 0, lastDate: null });
+      }
+      const agg = map.get(item.name);
+      if (!agg.lastDate || item.date > agg.lastDate) agg.lastDate = item.date;
+      if (item.status === 'pending') {
+        const remaining = remainingOf(item);
+        if (item.direction === 'receivable') agg.pendingReceivable += remaining;
+        else agg.pendingPayable += remaining;
+        agg.pendingCount++;
+      }
+    });
+
+    return [...map.values()]
+      .map(agg => ({
+        ...agg,
+        pendingReceivable: Math.round(agg.pendingReceivable * 100) / 100,
+        pendingPayable: Math.round(agg.pendingPayable * 100) / 100,
+        net: Math.round((agg.pendingReceivable - agg.pendingPayable) * 100) / 100
+      }))
+      .filter(agg => agg.pendingCount > 0)
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  }
+
+  function renderSplitSummary() {
+    const aggregates = getPersonAggregates();
+    const totalReceivable = Math.round(aggregates.reduce((s, a) => s + a.pendingReceivable, 0) * 100) / 100;
+    const totalPayable = Math.round(aggregates.reduce((s, a) => s + a.pendingPayable, 0) * 100) / 100;
+    const net = Math.round((totalReceivable - totalPayable) * 100) / 100;
+    el('splitSummary').innerHTML = `
+      <div><div class="label">應收合計</div><div class="value" style="color:var(--income)">${formatMoney(totalReceivable)}</div></div>
+      <div><div class="label">應付合計</div><div class="value" style="color:var(--expense)">${formatMoney(totalPayable)}</div></div>
+      <div><div class="label">淨部位</div><div class="value" style="color:${net >= 0 ? 'var(--income)' : 'var(--expense)'}">${formatMoney(net)}</div></div>
+    `;
+  }
+
+  function renderPersonAggregateList() {
+    const wrap = el('personAggregateList');
+    wrap.innerHTML = '';
+    const aggregates = getPersonAggregates();
+
+    if (aggregates.length === 0) {
+      wrap.innerHTML = '<div class="empty-note">目前沒有待結清的往來對象</div>';
+      return;
+    }
+
+    const allItems = collectLedgerItems();
+
+    aggregates.forEach(agg => {
+      const card = document.createElement('div');
+      card.className = 'person-card';
+      const isOpen = openPersonCards.has(agg.name);
+      card.innerHTML = `
+        <div class="person-card-top">
+          <div class="person-card-name">${escapeHtml(agg.name)}</div>
+          <div class="person-card-net" style="color:${agg.net >= 0 ? 'var(--income)' : 'var(--expense)'}">${agg.net >= 0 ? '應收 ' : '應付 '}${formatMoney(Math.abs(agg.net))}</div>
+        </div>
+        <div class="person-card-sub">
+          <span>${agg.pendingCount} 筆待結</span>
+          <span>最近異動 ${agg.lastDate || '-'}</span>
+        </div>
+        <div class="person-card-detail${isOpen ? ' open' : ''}"></div>
+      `;
+
+      const detailWrap = card.querySelector('.person-card-detail');
+      const top = card.querySelector('.person-card-top');
+      top.addEventListener('click', () => {
+        if (openPersonCards.has(agg.name)) {
+          openPersonCards.delete(agg.name);
+          detailWrap.classList.remove('open');
+        } else {
+          openPersonCards.add(agg.name);
+          detailWrap.classList.add('open');
+        }
+      });
+
+      if (isOpen) {
+        renderPersonDetail(detailWrap, agg.name, allItems);
+      }
+
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderPersonDetail(container, name, allItems) {
+    container.innerHTML = '';
+    ['receivable', 'payable'].forEach(direction => {
+      const pending = allItems.filter(it => it.name === name && it.direction === direction && it.status === 'pending');
+      if (pending.length === 0) return;
+
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'person-detail-group-title';
+      groupTitle.textContent = direction === 'receivable' ? '對方應付你' : '你應付對方';
+      container.appendChild(groupTitle);
+
+      pending
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'person-detail-item';
+          const remaining = remainingOf(item);
+          const paidNote = item.paidAmount > 0 ? `(已還${formatMoney(item.paidAmount)})` : '';
+          row.innerHTML = `<span>${item.date}・${escapeHtml(item.label)}${paidNote}</span><span style="font-weight:700;color:${direction === 'receivable' ? 'var(--income)' : 'var(--expense)'}">${formatMoney(remaining)}</span>`;
+          container.appendChild(row);
+        });
+
+      const totalRemaining = Math.round(pending.reduce((s, it) => s + remainingOf(it), 0) * 100) / 100;
+
+      const repayRow = document.createElement('div');
+      repayRow.className = 'repay-row';
+      repayRow.innerHTML = `
+        <input type="number" class="repay-input" placeholder="還款金額" min="0" step="0.01">
+        <button type="button" class="repay-apply">部分還款</button>
+      `;
+      repayRow.querySelector('.repay-apply').addEventListener('click', () => {
+        const input = repayRow.querySelector('.repay-input');
+        const amt = parseFloat(input.value);
+        if (!amt || amt <= 0) { showToast('請輸入還款金額'); return; }
+        repayPersonPartial(name, direction, amt);
+      });
+      container.appendChild(repayRow);
+
+      const settleAllBtn = document.createElement('button');
+      settleAllBtn.type = 'button';
+      settleAllBtn.className = 'settle-all-btn';
+      settleAllBtn.textContent = `✅ 全額結清(${formatMoney(totalRemaining)})`;
+      settleAllBtn.addEventListener('click', () => settleAllForPerson(name, direction));
+      container.appendChild(settleAllBtn);
+    });
+  }
+
+  function repayPersonPartial(name, direction, amountToApply) {
+    const items = collectLedgerItems()
+      .filter(it => it.name === name && it.direction === direction && it.status === 'pending')
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let remainingToApply = amountToApply;
+    items.forEach(it => {
+      if (remainingToApply <= 0) return;
+      const applied = applyRepayment(it, remainingToApply);
+      remainingToApply = Math.round((remainingToApply - applied) * 100) / 100;
+    });
+    showToast(`已還款 ${formatMoney(amountToApply - Math.max(remainingToApply, 0))}`);
+    persistLedgerChanges();
+  }
+
+  function settleAllForPerson(name, direction) {
+    const items = collectLedgerItems().filter(it => it.name === name && it.direction === direction && it.status === 'pending');
+    items.forEach(it => { applyRepayment(it, remainingOf(it)); });
+    showToast('已全額結清');
+    persistLedgerChanges();
+  }
+
   function renderSplitsOverview() {
+    renderSplitSummary();
+    renderPersonAggregateList();
+
     const wrap = el('splitsList');
     wrap.innerHTML = '';
-    const items = collectSplitItems(splitTab);
+    const items = collectLedgerItems()
+      .filter(it => it.status === splitTab)
+      .sort((a, b) => b.date.localeCompare(a.date));
 
     if (items.length === 0) {
       wrap.innerHTML = splitTab === 'pending'
@@ -1925,29 +2265,24 @@
       return;
     }
 
-    items.forEach(({ record: r, kind, participant }) => {
-      const s = r.split;
+    items.forEach(item => {
       const isPending = splitTab === 'pending';
-      let dirIcon, dirLabel, amount, who, colorClass;
+      const dirIcon = item.direction === 'receivable' ? '📤' : '📥';
+      const dirLabel = item.direction === 'receivable' ? '應收' : '應付';
+      const colorClass = item.direction === 'receivable' ? 'up' : 'down';
+      const remaining = remainingOf(item);
+      const paidNote = item.paidAmount > 0 && isPending ? `(已還${formatMoney(item.paidAmount)})` : '';
 
-      if (kind === 'payable') {
-        dirIcon = '📥'; dirLabel = '應付'; amount = s.counterpartAmount;
-        who = s.counterpartName || '朋友'; colorClass = 'down';
-      } else {
-        dirIcon = '📤'; dirLabel = '應收'; amount = participant.amount;
-        who = participant.name || '朋友'; colorClass = 'up';
-      }
-
-      const item = document.createElement('div');
-      item.className = 'holding-item';
-      item.innerHTML = `
+      const el2 = document.createElement('div');
+      el2.className = 'holding-item';
+      el2.innerHTML = `
         <div class="holding-top">
-          <div class="holding-name">${dirIcon} ${escapeHtml(who)} ・ ${escapeHtml(r.category)}</div>
-          <div class="holding-gain ${colorClass}">${dirLabel} ${formatMoney(amount)}</div>
+          <div class="holding-name">${dirIcon} ${escapeHtml(item.name)} ・ ${escapeHtml(item.label)}</div>
+          <div class="holding-gain ${colorClass}">${dirLabel} ${formatMoney(isPending ? remaining : item.amount)}${paidNote}</div>
         </div>
         <div class="holding-sub">
-          <span>${r.date}</span>
-          <span>帳單總額 ${formatMoney(s.totalAmount)}</span>
+          <span>${item.date}</span>
+          <span>${item.source === 'manualDebt' ? '手動欠款' : '帳單總額 ' + formatMoney(item.amount)}</span>
         </div>
         <div class="holding-actions">
           ${isPending ? '<button type="button" class="settle-btn">✅ 標記已結清</button>' : '<button type="button" class="unsettle-btn">↩️ 取消結清</button>'}
@@ -1955,85 +2290,124 @@
       `;
 
       if (isPending) {
-        item.querySelector('.settle-btn').addEventListener('click', () => {
-          if (kind === 'payable') settlePayable(r.id);
-          else settleParticipant(r.id, participant.id);
+        el2.querySelector('.settle-btn').addEventListener('click', () => {
+          applyRepayment(item, remainingOf(item));
+          persistLedgerChanges();
         });
       } else {
-        item.querySelector('.unsettle-btn').addEventListener('click', () => {
-          if (kind === 'payable') unsettlePayable(r.id);
-          else unsettleParticipant(r.id, participant.id);
+        el2.querySelector('.unsettle-btn').addEventListener('click', () => {
+          item._ref.status = 'pending';
+          item._ref.paidAmount = 0;
+          persistLedgerChanges();
         });
       }
 
-      wrap.appendChild(item);
+      wrap.appendChild(el2);
     });
   }
 
-  function settlePayable(recordId) {
-    const r = records.find(x => x.id === recordId);
-    if (!r || !r.split) return;
-    r.split.status = 'settled';
-    saveRecords();
-    renderLedger();
-  }
-
-  function unsettlePayable(recordId) {
-    const r = records.find(x => x.id === recordId);
-    if (!r || !r.split) return;
-    r.split.status = 'pending';
-    saveRecords();
-    renderLedger();
-  }
-
-  function settleParticipant(recordId, participantId) {
-    const r = records.find(x => x.id === recordId);
-    if (!r || !r.split || !r.split.participants) return;
-    const p = r.split.participants.find(x => x.id === participantId);
-    if (!p) return;
-
-    const incomeRecord = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      type: 'income',
-      category: '其他',
-      amount: p.amount,
-      date: todayStr(),
-      note: `收到${p.name ? p.name : '朋友'}分帳款(${r.category})`
-    };
-    records.push(incomeRecord);
-    p.settledRecordId = incomeRecord.id;
-    p.status = 'settled';
-    saveRecords();
-    renderLedger();
-  }
-
-  function unsettleParticipant(recordId, participantId) {
-    const r = records.find(x => x.id === recordId);
-    if (!r || !r.split || !r.split.participants) return;
-    const p = r.split.participants.find(x => x.id === participantId);
-    if (!p) return;
-
-    if (p.settledRecordId) {
-      records = records.filter(x => x.id !== p.settledRecordId);
-      p.settledRecordId = null;
+  // ---------- Manual debts (功能 1C) ----------
+  el('addDebtBtn').addEventListener('click', () => {
+    const formWrap = el('addDebtForm');
+    if (formWrap.style.display === 'block') {
+      formWrap.style.display = 'none';
+      return;
     }
-    p.status = 'pending';
-    saveRecords();
-    renderLedger();
+    formWrap.innerHTML = `
+      <div class="field">
+        <label>對象</label>
+        <input type="text" id="debtName" placeholder="姓名" list="splitNamesList">
+      </div>
+      <div class="type-toggle" id="debtDirToggle">
+        <button type="button" class="active" data-dir="receivable">對方欠我</button>
+        <button type="button" data-dir="payable">我欠對方</button>
+      </div>
+      <div class="field">
+        <label>金額</label>
+        <input type="number" id="debtAmount" inputmode="decimal" placeholder="0" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label>日期</label>
+        <input type="date" id="debtDate">
+      </div>
+      <div class="field">
+        <label>備註(選填)</label>
+        <input type="text" id="debtNote" placeholder="例如：現金代墊">
+      </div>
+      <button type="button" class="submit-btn" id="debtSubmitBtn">新增欠款</button>
+    `;
+    el('debtDate').value = todayStr();
+    let debtDirection = 'receivable';
+    formWrap.querySelectorAll('#debtDirToggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        formWrap.querySelectorAll('#debtDirToggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        debtDirection = btn.dataset.dir;
+      });
+    });
+    el('debtSubmitBtn').addEventListener('click', () => {
+      const name = el('debtName').value.trim();
+      const amount = parseFloat(el('debtAmount').value);
+      const date = el('debtDate').value;
+      const note = el('debtNote').value.trim();
+      if (!name) { showToast('請輸入對象姓名'); return; }
+      if (!amount || amount <= 0) { showToast('請輸入金額'); return; }
+      if (!date) { showToast('請選擇日期'); return; }
+
+      manualDebts.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        name, direction: debtDirection, amount,
+        paidAmount: 0, status: 'pending', date,
+        note: note || undefined
+      });
+      saveManualDebts();
+      showToast(`已新增欠款：${name} ${formatMoney(amount)}`);
+      formWrap.style.display = 'none';
+      renderLedger();
+    });
+    formWrap.style.display = 'block';
+  });
+
+  // ---------- One-time migration: legacy split-settlement income records ----------
+  function detectLegacySplitIncomeRecords() {
+    return records.filter(r =>
+      r.type === 'income' &&
+      r.category === '其他' &&
+      typeof r.note === 'string' &&
+      /^收到.+分帳款/.test(r.note)
+    );
+  }
+
+  function checkLegacySplitIncomeMigration() {
+    if (localStorage.getItem(LEGACY_SPLIT_INCOME_HANDLED_KEY) === 'true') return;
+    const legacy = detectLegacySplitIncomeRecords();
+    if (legacy.length === 0) {
+      localStorage.setItem(LEGACY_SPLIT_INCOME_HANDLED_KEY, 'true');
+      return;
+    }
+    const total = legacy.reduce((s, r) => s + r.amount, 0);
+    const banner = el('legacyMigrationBanner');
+    el('legacyMigrationText').textContent = `偵測到 ${legacy.length} 筆舊版分帳結清產生的收入記錄(合計 ${formatMoney(total)}),新版邏輯下這些會造成統計重複,建議移除。移除前請先匯出備份。`;
+    banner.style.display = 'flex';
+
+    el('legacyMigrationExportRemove').onclick = async () => {
+      await doExportBackup();
+      const idsToRemove = new Set(detectLegacySplitIncomeRecords().map(r => r.id));
+      records = records.filter(r => !idsToRemove.has(r.id));
+      saveRecords();
+      localStorage.setItem(LEGACY_SPLIT_INCOME_HANDLED_KEY, 'true');
+      banner.style.display = 'none';
+      showToast(`已移除 ${idsToRemove.size} 筆舊版分帳收入記錄`);
+      renderLedger();
+    };
+    el('legacyMigrationKeep').onclick = () => {
+      localStorage.setItem(LEGACY_SPLIT_INCOME_HANDLED_KEY, 'true');
+      banner.style.display = 'none';
+    };
   }
 
   function refreshSplitNamesList() {
-    const names = new Set();
-    records.forEach(r => {
-      if (!r.split) return;
-      if (r.split.direction === 'payable') {
-        if (r.split.counterpartName) names.add(r.split.counterpartName);
-      } else {
-        (r.split.participants || []).forEach(p => {
-          if (p.name) names.add(p.name);
-        });
-      }
-    });
+    const names = new Set(collectLedgerItems().map(it => it.name).filter(n => n && n !== '(未命名)'));
     el('splitNamesList').innerHTML = [...names].map(n => `<option value="${escapeHtml(n)}">`).join('');
   }
 
@@ -2405,8 +2779,8 @@
               id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
               name: p.name,
               amount: p.amount,
-              status: 'pending',
-              settledRecordId: null
+              paidAmount: 0,
+              status: 'pending'
             }))
           };
         } else {
@@ -2415,6 +2789,7 @@
             totalAmount: fullAmount,
             counterpartAmount: remainder,
             counterpartName: (cfg.counterpartName || '').trim(),
+            paidAmount: 0,
             status: remainder > 0 ? 'pending' : 'settled'
           };
         }
@@ -3049,6 +3424,7 @@
   renderLedger();
   renderSettingsSummary();
   checkBackupReminder();
+  checkLegacySplitIncomeMigration();
   el('amount').focus();
 
   if ('serviceWorker' in navigator) {
