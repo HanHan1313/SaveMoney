@@ -555,18 +555,57 @@
   }
 
   /* ---- CSV import preview ---- */
+  .csv-row-wrap {
+    border-bottom: 1px solid var(--border);
+  }
+  .csv-row-wrap:last-child { border-bottom: none; }
   .csv-row {
     display: flex;
     align-items: center;
     padding: 10px 0;
-    border-bottom: 1px solid var(--border);
   }
-  .csv-row:last-child { border-bottom: none; }
   .csv-check { width: 20px; height: 20px; margin-right: 10px; flex-shrink: 0; }
   .csv-info { flex: 1; min-width: 0; }
   .csv-desc { font-size: 14px; font-weight: 600; }
   .csv-date { font-size: 12px; color: var(--sub-text); }
   .csv-amount { font-size: 14px; font-weight: 700; white-space: nowrap; margin-left: 8px; }
+  .csv-split-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    margin-left: 8px;
+    flex-shrink: 0;
+  }
+  .csv-split-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .csv-split-panel {
+    padding: 0 0 14px;
+  }
+  .csv-split-panel .field {
+    margin-bottom: 10px;
+  }
+  .csv-split-panel .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-bottom: 6px;
+  }
+  .csv-split-panel .field input {
+    width: 100%;
+    font-size: 14px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
 
   /* ---- Split participants ---- */
   .participant-row {
@@ -2113,6 +2152,104 @@
     e.target.value = '';
   });
 
+  function ensureCsvSplitConfig(row) {
+    if (!row.splitConfig) {
+      row.splitConfig = {
+        enabled: false,
+        direction: 'receivable',
+        mine: Math.abs(row.amount) || 0,
+        participants: [],
+        counterpartName: ''
+      };
+    }
+    return row.splitConfig;
+  }
+
+  function buildCsvSplitPanel(row) {
+    const cfg = ensureCsvSplitConfig(row);
+    const panel = document.createElement('div');
+    panel.className = 'csv-split-panel';
+    panel.style.display = cfg.enabled ? 'block' : 'none';
+
+    const dirToggle = document.createElement('div');
+    dirToggle.className = 'type-toggle';
+    dirToggle.innerHTML = `
+      <button type="button" class="csv-split-dir-btn${cfg.direction === 'receivable' ? ' active' : ''}" data-dir="receivable">我代墊(對方還我)</button>
+      <button type="button" class="csv-split-dir-btn${cfg.direction === 'payable' ? ' active' : ''}" data-dir="payable">對方代墊(我還他)</button>
+    `;
+    panel.appendChild(dirToggle);
+
+    const mineField = document.createElement('div');
+    mineField.className = 'field';
+    mineField.innerHTML = `
+      <label>你的花費(其餘算對方的)</label>
+      <input type="number" class="csv-split-mine" min="0" step="0.01" value="${cfg.mine}">
+    `;
+    panel.appendChild(mineField);
+    mineField.querySelector('.csv-split-mine').addEventListener('input', (e) => {
+      cfg.mine = parseFloat(e.target.value) || 0;
+    });
+
+    const participantsWrap = document.createElement('div');
+    participantsWrap.className = 'field';
+    participantsWrap.style.display = cfg.direction === 'receivable' ? 'block' : 'none';
+    participantsWrap.innerHTML = `
+      <label>分帳對象明細(每人金額加總須等於「你的花費」以外的金額)</label>
+      <div class="csv-split-participants-list"></div>
+      <button type="button" class="submit-btn btn-outline csv-split-add-participant">+ 新增分帳對象</button>
+    `;
+    const participantsList = participantsWrap.querySelector('.csv-split-participants-list');
+
+    function renderParticipants() {
+      participantsList.innerHTML = '';
+      cfg.participants.forEach((p, pIdx) => {
+        const pRow = document.createElement('div');
+        pRow.className = 'participant-row';
+        pRow.innerHTML = `
+          <input type="text" class="participant-name" placeholder="姓名" value="${escapeHtml(p.name || '')}">
+          <input type="number" class="participant-amount" placeholder="金額" min="0" step="0.01" value="${p.amount || ''}">
+          <button type="button" class="participant-remove">×</button>
+        `;
+        pRow.querySelector('.participant-name').addEventListener('input', (e) => { p.name = e.target.value; });
+        pRow.querySelector('.participant-amount').addEventListener('input', (e) => { p.amount = parseFloat(e.target.value) || 0; });
+        pRow.querySelector('.participant-remove').addEventListener('click', () => {
+          cfg.participants.splice(pIdx, 1);
+          renderParticipants();
+        });
+        participantsList.appendChild(pRow);
+      });
+    }
+    renderParticipants();
+
+    participantsWrap.querySelector('.csv-split-add-participant').addEventListener('click', () => {
+      cfg.participants.push({ name: '', amount: '' });
+      renderParticipants();
+    });
+    panel.appendChild(participantsWrap);
+
+    const payableWrap = document.createElement('div');
+    payableWrap.className = 'field';
+    payableWrap.style.display = cfg.direction === 'payable' ? 'block' : 'none';
+    payableWrap.innerHTML = `
+      <label>分帳對象(選填)</label>
+      <input type="text" class="csv-split-name" placeholder="例如：小明" value="${escapeHtml(cfg.counterpartName || '')}">
+    `;
+    payableWrap.querySelector('.csv-split-name').addEventListener('input', (e) => { cfg.counterpartName = e.target.value; });
+    panel.appendChild(payableWrap);
+
+    dirToggle.querySelectorAll('.csv-split-dir-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        dirToggle.querySelectorAll('.csv-split-dir-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        cfg.direction = btn.dataset.dir;
+        participantsWrap.style.display = cfg.direction === 'receivable' ? 'block' : 'none';
+        payableWrap.style.display = cfg.direction === 'payable' ? 'block' : 'none';
+      });
+    });
+
+    return panel;
+  }
+
   function renderCsvPreview() {
     const wrap = el('csvPreview');
     wrap.innerHTML = '';
@@ -2140,9 +2277,13 @@
     const list = document.createElement('div');
     pageRows.forEach((row, i) => {
       const idx = startIdx + i;
+      const rowWrap = document.createElement('div');
+      rowWrap.className = 'csv-row-wrap';
+
       const line = document.createElement('div');
       line.className = 'csv-row';
       const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
+      const splitActive = row.splitConfig && row.splitConfig.enabled;
       line.innerHTML = `
         <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'} ${csvCheckedIndices.has(idx) ? 'checked' : ''}>
         <div class="csv-info">
@@ -2150,12 +2291,28 @@
           <div class="csv-date">${row.date || '日期無法辨識'}</div>
         </div>
         <div class="csv-amount" style="color:${row.amount < 0 ? 'var(--income)' : 'var(--expense)'}">${isNaN(row.amount) ? '-' : formatMoney(row.amount)}</div>
+        ${row.valid ? `<button type="button" class="csv-split-btn${splitActive ? ' active' : ''}" title="設定分帳">🤝</button>` : ''}
       `;
       line.querySelector('.csv-check').addEventListener('change', (ev) => {
         if (ev.target.checked) csvCheckedIndices.add(idx); else csvCheckedIndices.delete(idx);
         updateSummary();
       });
-      list.appendChild(line);
+      rowWrap.appendChild(line);
+
+      if (row.valid) {
+        const splitPanel = buildCsvSplitPanel(row);
+        rowWrap.appendChild(splitPanel);
+
+        const splitBtn = line.querySelector('.csv-split-btn');
+        splitBtn.addEventListener('click', () => {
+          const cfg = ensureCsvSplitConfig(row);
+          cfg.enabled = !cfg.enabled;
+          splitPanel.style.display = cfg.enabled ? 'block' : 'none';
+          splitBtn.classList.toggle('active', cfg.enabled);
+        });
+      }
+
+      list.appendChild(rowWrap);
     });
     wrap.appendChild(list);
 
@@ -2188,20 +2345,64 @@
     const globalType = el('csvType').value;
     const globalCategory = el('csvCategory').value;
     let count = 0;
+    let skipped = 0;
 
     csvCheckedIndices.forEach((idx) => {
       const row = csvRows[idx];
       if (!row || !row.valid) return;
       const flip = row.amount < 0;
       const type = flip ? (globalType === 'expense' ? 'income' : 'expense') : globalType;
+      const fullAmount = Math.abs(row.amount);
       const record = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + count,
         type,
         category: globalCategory,
-        amount: Math.abs(row.amount),
+        amount: fullAmount,
         date: row.date
       };
       if (row.note) record.note = row.note;
+
+      const cfg = row.splitConfig;
+      if (type === 'expense' && cfg && cfg.enabled) {
+        const mine = parseFloat(cfg.mine);
+        if (isNaN(mine) || mine <= 0 || mine > fullAmount) {
+          skipped++;
+          return;
+        }
+        const remainder = Math.round((fullAmount - mine) * 100) / 100;
+        record.amount = mine;
+
+        if (cfg.direction === 'receivable') {
+          const participants = (cfg.participants || [])
+            .map(p => ({ name: (p.name || '').trim(), amount: parseFloat(p.amount) }))
+            .filter(p => !isNaN(p.amount) && p.amount > 0);
+          const sum = Math.round(participants.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+          if (remainder > 0 && (participants.length === 0 || Math.abs(sum - remainder) > 0.01)) {
+            skipped++;
+            return;
+          }
+          record.split = {
+            direction: 'receivable',
+            totalAmount: fullAmount,
+            participants: participants.map(p => ({
+              id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+              name: p.name,
+              amount: p.amount,
+              status: 'pending',
+              settledRecordId: null
+            }))
+          };
+        } else {
+          record.split = {
+            direction: 'payable',
+            totalAmount: fullAmount,
+            counterpartAmount: remainder,
+            counterpartName: (cfg.counterpartName || '').trim(),
+            status: remainder > 0 ? 'pending' : 'settled'
+          };
+        }
+      }
+
       records.push(record);
       count++;
     });
@@ -2210,7 +2411,8 @@
     csvRows = [];
     csvCheckedIndices = new Set();
     csvPage = 1;
-    el('csvPreview').innerHTML = `<div class="empty-note">已成功匯入 ${count} 筆紀錄</div>`;
+    const skipMsg = skipped > 0 ? `，${skipped} 筆因分帳金額設定有誤被略過(請檢查金額後重新匯入該筆)` : '';
+    el('csvPreview').innerHTML = `<div class="empty-note">已成功匯入 ${count} 筆紀錄${skipMsg}</div>`;
     renderLedger();
   }
 
