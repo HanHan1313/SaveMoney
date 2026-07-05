@@ -3474,18 +3474,26 @@
       <div><div class="label">投資持股</div><div class="value">${investments.length} 檔</div></div>
       <div><div class="label">持股截圖</div><div class="value">${screenshots.length} 張</div></div>
       <div><div class="label">自訂類別</div><div class="value">${catCount} 個</div></div>
+      <div><div class="label">手動欠款</div><div class="value">${manualDebts.length} 筆</div></div>
+      <div><div class="label">帳單類型</div><div class="value">${billTemplates.length} 個</div></div>
     `;
   }
+
+  const BACKUP_VERSION = 2;
 
   function buildBackup() {
     return {
       app: 'expense-tracker',
-      version: 1,
+      version: BACKUP_VERSION,
       exportedAt: new Date().toISOString(),
       records,
       customCategories,
       investments,
-      screenshots
+      screenshots,
+      categoryUsage,
+      manualDebts,
+      billTemplates,
+      billInstances
     };
   }
 
@@ -3569,7 +3577,12 @@
   });
 
   function mergeBackup(data) {
-    let addedRecords = 0, addedInvestments = 0, addedScreenshots = 0, addedCategories = 0;
+    if (typeof data.version === 'number' && data.version > BACKUP_VERSION) {
+      if (!confirm(`這份備份來自較新版本(v${data.version}，目前支援 v${BACKUP_VERSION})，部分資料可能無法還原。仍要繼續匯入嗎？`)) return;
+    }
+
+    let addedRecords = 0, addedInvestments = 0, addedScreenshots = 0, addedCategories = 0,
+        addedDebts = 0, addedBillTemplates = 0, addedBillInstances = 0;
 
     if (Array.isArray(data.records)) {
       const existingIds = new Set(records.map(r => r.id));
@@ -3621,9 +3634,57 @@
       });
     }
 
+    if (data.categoryUsage) {
+      ['expense', 'income'].forEach(type => {
+        const incoming = data.categoryUsage[type];
+        if (!incoming || typeof incoming !== 'object') return;
+        categoryUsage[type] = categoryUsage[type] || {};
+        Object.keys(incoming).forEach(key => {
+          categoryUsage[type][key] = Math.max(categoryUsage[type][key] || 0, incoming[key] || 0);
+        });
+      });
+    }
+
+    if (Array.isArray(data.manualDebts)) {
+      const existingIds = new Set(manualDebts.map(d => d.id));
+      data.manualDebts.forEach(d => {
+        if (d && d.id && !existingIds.has(d.id)) {
+          manualDebts.push(d);
+          existingIds.add(d.id);
+          addedDebts++;
+        }
+      });
+    }
+
+    if (Array.isArray(data.billTemplates)) {
+      const existingIds = new Set(billTemplates.map(t => t.id));
+      data.billTemplates.forEach(t => {
+        if (t && t.id && !existingIds.has(t.id)) {
+          billTemplates.push(t);
+          existingIds.add(t.id);
+          addedBillTemplates++;
+        }
+      });
+    }
+
+    if (Array.isArray(data.billInstances)) {
+      const existingIds = new Set(billInstances.map(i => i.id));
+      data.billInstances.forEach(i => {
+        if (i && i.id && !existingIds.has(i.id)) {
+          billInstances.push(i);
+          existingIds.add(i.id);
+          addedBillInstances++;
+        }
+      });
+    }
+
     saveRecords();
     saveCustomCategories();
     saveInvestments();
+    saveCategoryUsage();
+    saveManualDebts();
+    saveBillTemplates();
+    saveBillInstances();
     try {
       saveScreenshots();
     } catch (err) {
@@ -3632,12 +3693,20 @@
       alert('部分截圖因儲存空間已滿而未能匯入，其餘資料已合併完成');
     }
 
-    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別`);
+    if (data.exportedAt) {
+      localStorage.setItem(LAST_BACKUP_KEY, String(new Date(data.exportedAt).getTime()));
+    }
+
+    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單`);
 
     renderCategoryGrid();
     renderLedger();
     renderInvestments();
     renderSettingsSummary();
+    generateBillInstancesIfNeeded();
+    renderBillsPage();
+    checkBillsReminder();
+    checkBackupReminder();
   }
 
   el('clearAllBtn').addEventListener('click', () => {
@@ -3648,15 +3717,25 @@
     customCategories = { expense: [], income: [] };
     investments = [];
     screenshots = [];
+    categoryUsage = { expense: {}, income: {} };
+    manualDebts = [];
+    billTemplates = [];
+    billInstances = [];
     saveRecords();
     saveCustomCategories();
     saveInvestments();
     saveScreenshots();
+    saveCategoryUsage();
+    saveManualDebts();
+    saveBillTemplates();
+    saveBillInstances();
 
     renderCategoryGrid();
     renderLedger();
     renderInvestments();
     renderSettingsSummary();
+    renderBillsPage();
+    checkBillsReminder();
   });
 
   // ================= BILLS (功能二) =================
