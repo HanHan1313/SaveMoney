@@ -1985,19 +1985,41 @@
       btn.classList.add('active');
       splitDirection = btn.dataset.dir;
       updateSplitDirectionUI();
+      if (splitDirection === 'receivable') recalcParticipantAmounts();
     });
   });
   updateSplitDirectionUI();
 
+  // Distributes `remaining` as whole numbers across the auto (non-manual) rows in `rows`,
+  // leaving manually-edited rows untouched. Any remainder from integer division goes to
+  // the first auto row. Shared by both the manual entry form and the CSV split panel.
+  function distributeRemaining(rows, remaining, getAmount, setAmount, isManual) {
+    const autoRows = rows.filter(r => !isManual(r));
+    if (autoRows.length === 0) return;
+    const manualSum = rows.filter(r => isManual(r)).reduce((s, r) => s + (getAmount(r) || 0), 0);
+    const toDistribute = Math.max(0, Math.round(remaining - manualSum));
+    const base = Math.floor(toDistribute / autoRows.length);
+    const remainder = toDistribute - base * autoRows.length;
+    autoRows.forEach((r, i) => setAmount(r, base + (i === 0 ? remainder : 0)));
+  }
+
   function addParticipantRow(name, amount) {
     const row = document.createElement('div');
     row.className = 'participant-row';
+    row.dataset.manual = 'false';
     row.innerHTML = `
       <input type="text" class="participant-name" placeholder="姓名" value="${name ? escapeHtml(name) : ''}" list="splitNamesList">
-      <input type="number" class="participant-amount" placeholder="金額" min="0" step="0.01" value="${amount || ''}">
+      <input type="number" class="participant-amount" placeholder="金額" min="0" step="1" value="${amount || ''}">
       <button type="button" class="participant-remove">×</button>
     `;
-    row.querySelector('.participant-remove').addEventListener('click', () => row.remove());
+    row.querySelector('.participant-amount').addEventListener('input', () => {
+      row.dataset.manual = 'true';
+      recalcParticipantAmounts();
+    });
+    row.querySelector('.participant-remove').addEventListener('click', () => {
+      row.remove();
+      recalcParticipantAmounts();
+    });
     el('participantsList').appendChild(row);
   }
 
@@ -2005,7 +2027,28 @@
     el('participantsList').innerHTML = '';
   }
 
-  el('addParticipantBtn').addEventListener('click', () => addParticipantRow('', ''));
+  function resetParticipantManualFlags() {
+    document.querySelectorAll('#participantsList .participant-row').forEach(row => { row.dataset.manual = 'false'; });
+  }
+
+  function recalcParticipantAmounts() {
+    if (splitDirection !== 'receivable') return;
+    const total = parseFloat(el('splitTotal').value) || 0;
+    const mine = parseFloat(el('amount').value) || 0;
+    const remaining = total - mine;
+    const rows = [...document.querySelectorAll('#participantsList .participant-row')];
+    distributeRemaining(
+      rows, remaining,
+      (r) => parseFloat(r.querySelector('.participant-amount').value),
+      (r, amt) => { r.querySelector('.participant-amount').value = amt; },
+      (r) => r.dataset.manual === 'true'
+    );
+  }
+
+  el('addParticipantBtn').addEventListener('click', () => {
+    addParticipantRow('', '');
+    recalcParticipantAmounts();
+  });
 
   function collectParticipants() {
     return [...document.querySelectorAll('#participantsList .participant-row')].map(row => ({
@@ -2014,16 +2057,26 @@
     })).filter(p => !isNaN(p.amount) && p.amount > 0);
   }
 
+  // "你的花費" changing resets all manual overrides and redistributes evenly across everyone.
+  el('amount').addEventListener('input', () => {
+    if (!el('splitToggle').checked) return;
+    resetParticipantManualFlags();
+    recalcParticipantAmounts();
+  });
+
   function recalcSplitAmount() {
     const total = parseFloat(el('splitTotal').value);
     const n = parseInt(el('splitPeople').value, 10);
-    if (!(total > 0 && n > 0)) return;
-    const per = Math.round((total / n) * 100) / 100;
-    el('amount').value = per.toFixed(2);
-    if (splitDirection === 'receivable') {
-      clearParticipants();
-      for (let i = 1; i < n; i++) addParticipantRow(`朋友${i}`, per.toFixed(2));
+    if (total > 0 && n > 0) {
+      const mine = Math.round(total / n);
+      el('amount').value = mine;
+      if (splitDirection === 'receivable') {
+        clearParticipants();
+        for (let i = 1; i < n; i++) addParticipantRow(`朋友${i}`, '');
+      }
     }
+    resetParticipantManualFlags();
+    recalcParticipantAmounts();
   }
   el('splitTotal').addEventListener('input', recalcSplitAmount);
   el('splitPeople').addEventListener('input', recalcSplitAmount);
@@ -2998,6 +3051,7 @@
 
   function buildCsvSplitPanel(row) {
     const cfg = ensureCsvSplitConfig(row);
+    const fullAmount = Math.abs(row.amount) || 0;
     const panel = document.createElement('div');
     panel.className = 'csv-split-panel';
     panel.style.display = cfg.enabled ? 'block' : 'none';
@@ -3014,11 +3068,15 @@
     mineField.className = 'field';
     mineField.innerHTML = `
       <label>你的花費(其餘算對方的)</label>
-      <input type="number" class="csv-split-mine" min="0" step="0.01" value="${cfg.mine}">
+      <input type="number" class="csv-split-mine" min="0" step="1" value="${cfg.mine}">
     `;
     panel.appendChild(mineField);
     mineField.querySelector('.csv-split-mine').addEventListener('input', (e) => {
       cfg.mine = parseFloat(e.target.value) || 0;
+      if (cfg.direction === 'receivable') {
+        cfg.participants.forEach(p => { p.manual = false; });
+        recalcCsvParticipants();
+      }
     });
 
     const participantsWrap = document.createElement('div');
@@ -3031,6 +3089,22 @@
     `;
     const participantsList = participantsWrap.querySelector('.csv-split-participants-list');
 
+    function recalcCsvParticipants() {
+      const remaining = fullAmount - (parseFloat(cfg.mine) || 0);
+      distributeRemaining(
+        cfg.participants, remaining,
+        (p) => p.amount,
+        (p, amt) => { p.amount = amt; },
+        (p) => !!p.manual
+      );
+      // Sync visible values without rebuilding focused input's DOM node.
+      const rowEls = [...participantsList.querySelectorAll('.participant-row')];
+      rowEls.forEach((rowEl, i) => {
+        const amountInput = rowEl.querySelector('.participant-amount');
+        if (document.activeElement !== amountInput) amountInput.value = cfg.participants[i].amount || '';
+      });
+    }
+
     function renderParticipants() {
       participantsList.innerHTML = '';
       cfg.participants.forEach((p, pIdx) => {
@@ -3038,14 +3112,19 @@
         pRow.className = 'participant-row';
         pRow.innerHTML = `
           <input type="text" class="participant-name" placeholder="姓名" value="${escapeHtml(p.name || '')}" list="splitNamesList">
-          <input type="number" class="participant-amount" placeholder="金額" min="0" step="0.01" value="${p.amount || ''}">
+          <input type="number" class="participant-amount" placeholder="金額" min="0" step="1" value="${p.amount || ''}">
           <button type="button" class="participant-remove">×</button>
         `;
         pRow.querySelector('.participant-name').addEventListener('input', (e) => { p.name = e.target.value; });
-        pRow.querySelector('.participant-amount').addEventListener('input', (e) => { p.amount = parseFloat(e.target.value) || 0; });
+        pRow.querySelector('.participant-amount').addEventListener('input', (e) => {
+          p.amount = parseFloat(e.target.value) || 0;
+          p.manual = true;
+          recalcCsvParticipants();
+        });
         pRow.querySelector('.participant-remove').addEventListener('click', () => {
           cfg.participants.splice(pIdx, 1);
           renderParticipants();
+          recalcCsvParticipants();
         });
         participantsList.appendChild(pRow);
       });
@@ -3053,8 +3132,9 @@
     renderParticipants();
 
     participantsWrap.querySelector('.csv-split-add-participant').addEventListener('click', () => {
-      cfg.participants.push({ name: '', amount: '' });
+      cfg.participants.push({ name: '', amount: '', manual: false });
       renderParticipants();
+      recalcCsvParticipants();
     });
     panel.appendChild(participantsWrap);
 
@@ -3075,6 +3155,7 @@
         cfg.direction = btn.dataset.dir;
         participantsWrap.style.display = cfg.direction === 'receivable' ? 'block' : 'none';
         payableWrap.style.display = cfg.direction === 'payable' ? 'block' : 'none';
+        if (cfg.direction === 'receivable') recalcCsvParticipants();
       });
     });
 
@@ -3164,14 +3245,14 @@
         const row = csvRows[idx];
         if (!row || !row.valid) return;
         const fullAmt = Math.abs(row.amount);
-        const mine = Math.round(fullAmt * (pct / 100) * 100) / 100;
-        const remainder = Math.round((fullAmt - mine) * 100) / 100;
+        const mine = Math.round(fullAmt * (pct / 100));
+        const remainder = Math.max(0, Math.round(fullAmt - mine));
         const cfg = ensureCsvSplitConfig(row);
         cfg.enabled = true;
         cfg.direction = direction;
         cfg.mine = mine;
         if (direction === 'receivable') {
-          cfg.participants = [{ name, amount: remainder }];
+          cfg.participants = [{ name, amount: remainder, manual: false }];
         } else {
           cfg.counterpartName = name;
         }
