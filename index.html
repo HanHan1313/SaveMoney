@@ -1106,6 +1106,14 @@
   .changelog-date { font-size: 11px; color: var(--sub-text); margin-left: 6px; }
   .changelog-title { font-size: 14px; font-weight: 700; margin: 2px 0 4px; }
   .changelog-desc { font-size: 12px; color: var(--sub-text); line-height: 1.6; }
+  .split-collapsed-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(0,122,255,0.12);
+    color: var(--accent);
+  }
 
   /* ---- Pagination ---- */
   .pagination {
@@ -1262,17 +1270,19 @@
 
     <!-- CSV Import -->
     <div class="card import-section">
-      <h2>批次匯入信用卡明細</h2>
-      <div class="filter-row">
-        <select id="csvType">
-          <option value="expense">支出</option>
-          <option value="income">收入</option>
-        </select>
-        <select id="csvCategory"></select>
+      <button type="button" class="accordion-toggle" data-target="csvImportBody">批次匯入信用卡明細 <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="csvImportBody">
+        <div class="filter-row">
+          <select id="csvType">
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+          </select>
+          <select id="csvCategory"></select>
+        </div>
+        <input type="file" id="csvFile" accept=".csv,text/csv" style="display:none">
+        <button type="button" class="submit-btn btn-outline" id="csvImportBtn">📥 選擇 CSV 檔案</button>
+        <div id="csvPreview" style="margin-top:14px;"></div>
       </div>
-      <input type="file" id="csvFile" accept=".csv,text/csv" style="display:none">
-      <button type="button" class="submit-btn btn-outline" id="csvImportBtn">📥 選擇 CSV 檔案</button>
-      <div id="csvPreview" style="margin-top:14px;"></div>
     </div>
 
     <!-- Pie Chart -->
@@ -1286,20 +1296,22 @@
 
     <!-- Split overview -->
     <div class="card split-section">
-      <h2>分帳總覽</h2>
-      <div class="summary-grid" id="splitSummary"></div>
+      <button type="button" class="accordion-toggle" data-target="splitOverviewBody">分帳總覽 <span class="split-collapsed-badge" id="splitCollapsedBadge"></span> <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="splitOverviewBody">
+        <div class="summary-grid" id="splitSummary"></div>
 
-      <button type="button" class="submit-btn btn-outline" id="addDebtBtn" style="margin:14px 0 0;">+ 新增欠款(不綁消費)</button>
-      <div id="addDebtForm" style="display:none; margin-top:12px;"></div>
+        <button type="button" class="submit-btn btn-outline" id="addDebtBtn" style="margin:14px 0 0;">+ 新增欠款(不綁消費)</button>
+        <div id="addDebtForm" style="display:none; margin-top:12px;"></div>
 
-      <div id="personAggregateList" style="margin-top:14px;"></div>
+        <div id="personAggregateList" style="margin-top:14px;"></div>
 
-      <div class="split-detail-heading">全部明細</div>
-      <div class="split-tabs" id="splitTabs">
-        <button type="button" class="active" data-tab="pending">待結</button>
-        <button type="button" data-tab="settled">已結清</button>
+        <div class="split-detail-heading">全部明細</div>
+        <div class="split-tabs" id="splitTabs">
+          <button type="button" class="active" data-tab="pending">待結</button>
+          <button type="button" data-tab="settled">已結清</button>
+        </div>
+        <div id="splitsList"></div>
       </div>
-      <div id="splitsList"></div>
     </div>
 
     <!-- History -->
@@ -2653,6 +2665,9 @@
     renderSplitSummary();
     renderPersonAggregateList();
 
+    const pendingCount = collectLedgerItems().filter(it => it.status === 'pending').length;
+    el('splitCollapsedBadge').textContent = pendingCount > 0 ? `${pendingCount} 筆待結` : '';
+
     const wrap = el('splitsList');
     wrap.innerHTML = '';
     const items = collectLedgerItems()
@@ -3746,8 +3761,8 @@
     if (e.target.id === 'lightbox') closeLightbox();
   });
 
-  // ================= SETTINGS: ACCORDIONS (usage guide / changelog) =================
-  el('page-settings').addEventListener('click', (e) => {
+  // ================= ACCORDIONS (usage guide / changelog / collapsible cards) =================
+  document.addEventListener('click', (e) => {
     const btn = e.target.closest('.accordion-toggle, .usage-section-toggle');
     if (!btn) return;
     const target = el(btn.dataset.target);
