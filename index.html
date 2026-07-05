@@ -1029,6 +1029,84 @@
   }
   .bill-history-item:last-child { border-bottom: none; }
 
+  /* ---- Accordions (usage guide / changelog) ---- */
+  .accordion-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0;
+    background: none;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: left;
+  }
+  .accordion-arrow {
+    font-size: 12px;
+    color: var(--sub-text);
+    transition: transform .2s;
+    flex-shrink: 0;
+    margin-left: 8px;
+  }
+  .accordion-toggle.expanded .accordion-arrow { transform: rotate(180deg); }
+  .accordion-body {
+    display: none;
+    margin-top: 14px;
+  }
+  .accordion-body.open { display: block; }
+
+  .usage-section {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+  .usage-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .usage-section-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    background: none;
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: left;
+  }
+  .usage-section-body {
+    display: none;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .usage-section-body.open { display: block; }
+  .usage-section-body p { margin: 0 0 10px; }
+  .usage-section-body ol, .usage-section-body ul { margin: 0 0 10px; padding-left: 20px; }
+  .usage-section-body strong { color: var(--accent); }
+  .usage-diagram {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    margin: 10px 0;
+    background: var(--bg);
+    border-radius: 12px;
+  }
+
+  .changelog-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .changelog-item:last-child { border-bottom: none; }
+  .changelog-version { font-size: 13px; font-weight: 700; color: var(--accent); }
+  .changelog-date { font-size: 11px; color: var(--sub-text); margin-left: 6px; }
+  .changelog-title { font-size: 14px; font-weight: 700; margin: 2px 0 4px; }
+  .changelog-desc { font-size: 12px; color: var(--sub-text); line-height: 1.6; }
+
   /* ---- Pagination ---- */
   .pagination {
     display: flex;
@@ -1328,6 +1406,195 @@
     <div class="card">
       <div class="month-label">目前資料摘要</div>
       <div class="settings-summary" id="settingsSummary"></div>
+    </div>
+
+    <div class="card">
+      <button type="button" class="accordion-toggle" data-target="usageGuideBody">📖 使用說明 <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="usageGuideBody">
+
+        <div class="usage-section">
+          <button type="button" class="usage-section-toggle" data-target="usage-ledger">🏠 記帳頁 — 日常記錄與匯入 <span class="accordion-arrow">▾</span></button>
+          <div class="usage-section-body" id="usage-ledger">
+            <p><strong>這一頁做什麼</strong>:記錄每一筆收支,是最常用的頁面。</p>
+
+            <p><strong>快速記一筆(10 秒)</strong><br>
+            ① 輸入金額 → ② 日期預設今天(可一鍵切昨天)→ ③ 點類別按鈕,點下即完成記錄,不用按儲存。<br>
+            類別按鈕會依使用頻率自動排前面。信用卡消費不用手記,月底統一匯入。</p>
+
+            <svg class="usage-diagram" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+              <rect x="20" y="10" width="260" height="60" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
+              <circle cx="40" cy="30" r="12" fill="#007aff"/>
+              <text x="40" y="35" text-anchor="middle" font-size="13" fill="#ffffff" font-weight="bold">①</text>
+              <text x="65" y="27" font-size="12" fill="#8e8e93">金額</text>
+              <rect x="65" y="34" width="80" height="20" rx="6" fill="#f5f5f7" stroke="#e5e5ea"/>
+              <text x="75" y="49" font-size="12" fill="#1c1c1e">0</text>
+
+              <line x1="150" y1="72" x2="150" y2="93" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow1)"/>
+
+              <rect x="20" y="96" width="260" height="60" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
+              <circle cx="40" cy="116" r="12" fill="#007aff"/>
+              <text x="40" y="121" text-anchor="middle" font-size="13" fill="#ffffff" font-weight="bold">②</text>
+              <text x="65" y="113" font-size="12" fill="#8e8e93">日期</text>
+              <rect x="65" y="120" width="60" height="22" rx="8" fill="#007aff"/>
+              <text x="95" y="135" text-anchor="middle" font-size="11" fill="#ffffff">今天</text>
+              <rect x="132" y="120" width="60" height="22" rx="8" fill="#f5f5f7" stroke="#e5e5ea"/>
+              <text x="162" y="135" text-anchor="middle" font-size="11" fill="#1c1c1e">昨天</text>
+
+              <line x1="150" y1="158" x2="150" y2="179" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow1)"/>
+
+              <rect x="20" y="182" width="260" height="105" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
+              <circle cx="40" cy="202" r="12" fill="#007aff"/>
+              <text x="40" y="207" text-anchor="middle" font-size="13" fill="#ffffff" font-weight="bold">③</text>
+              <text x="65" y="207" font-size="12" fill="#8e8e93">點類別即完成</text>
+              <rect x="35" y="218" width="55" height="30" rx="8" fill="#ff3b30"/>
+              <text x="62" y="237" text-anchor="middle" font-size="10" fill="#ffffff">🍔餐飲</text>
+              <rect x="98" y="218" width="55" height="30" rx="8" fill="#f5f5f7" stroke="#e5e5ea"/>
+              <text x="125" y="237" text-anchor="middle" font-size="10" fill="#1c1c1e">🚌交通</text>
+              <rect x="161" y="218" width="55" height="30" rx="8" fill="#f5f5f7" stroke="#e5e5ea"/>
+              <text x="188" y="237" text-anchor="middle" font-size="10" fill="#1c1c1e">🎮娛樂</text>
+              <rect x="224" y="218" width="35" height="30" rx="8" fill="#f5f5f7" stroke="#e5e5ea" stroke-dasharray="3,2"/>
+              <text x="241" y="237" text-anchor="middle" font-size="10" fill="#8e8e93">⋯</text>
+              <text x="35" y="266" font-size="11" fill="#8e8e93">點下即自動記錄</text>
+              <text x="35" y="280" font-size="11" fill="#8e8e93">不用按儲存</text>
+
+              <defs>
+                <marker id="arrow1" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#8e8e93"/>
+                </marker>
+              </defs>
+            </svg>
+
+            <p><strong>分帳(和別人分攤時)</strong></p>
+            <ol>
+              <li>記帳時打開「與他人分帳」開關</li>
+              <li>選方向:<strong>我代墊</strong>(我先付全額,對方之後還我)或<strong>對方代墊</strong>(對方先付,我之後還他)</li>
+              <li>填帳單總金額與對方分攤金額 → 記錄只計入「我自己的花費」</li>
+              <li>對方欠的/我欠的,自動進入「分帳總覽」追蹤</li>
+            </ol>
+
+            <p><strong>批次匯入信用卡明細(每月一次)</strong></p>
+            <ol>
+              <li>準備 CSV,格式:<code>交易日期,消費說明,金額</code>(負數=退款)</li>
+              <li>選擇檔案 → 進入預覽,先勾選要匯入的列</li>
+              <li>勾多筆 → 批次設定類別(可分批設不同類別);需要分帳的勾選後批次分帳</li>
+              <li>標示「疑似重複」的列(和既有記錄日期+金額+說明相同)保持不勾——上月已匯入的消費會被自動攔下</li>
+              <li>按確認匯入才寫入</li>
+            </ol>
+
+            <p><strong>分帳總覽(追蹤欠款)</strong></p>
+            <ul>
+              <li>按對象顯示淨額:綠色=對方欠我,紅色=我欠對方</li>
+              <li>收到還款 → 點對象 → 輸入金額(可部分還款)→ 結清</li>
+              <li><strong>結清不會產生收入/支出</strong>:你的花費在記帳當下已定案,還款只是銷掉欠款,損益表不變</li>
+              <li>不綁消費的欠款(如純代墊現金)用「新增欠款」記</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="usage-section">
+          <button type="button" class="usage-section-toggle" data-target="usage-report">📊 損益表頁 — 每月收支總覽 <span class="accordion-arrow">▾</span></button>
+          <div class="usage-section-body" id="usage-report">
+            <p><strong>這一頁做什麼</strong>:看每個月的收入、支出與結餘。</p>
+            <ul>
+              <li>支出金額一律以「我的實際負擔」計算:分帳過的消費只算自己的份</li>
+              <li>卡費繳納、分帳還款都不會出現在這裡(避免重複計算),數字即真實消費水準</li>
+              <li>搭配記帳頁的本月支出比例,檢視各類別占比</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="usage-section">
+          <button type="button" class="usage-section-toggle" data-target="usage-bills">🧾 帳單頁 — 固定支出不再忘記 <span class="accordion-arrow">▾</span></button>
+          <div class="usage-section-body" id="usage-bills">
+            <p><strong>這一頁做什麼</strong>:追蹤每月要繳的帳單,繳了沒、繳多少。</p>
+
+            <p><strong>建立帳單(一次設定)</strong></p>
+            <ul>
+              <li>固定金額(管理費、電話費):設名稱、金額、每月繳費日;可開「繳費時同步記支出」</li>
+              <li>浮動金額(信用卡費):設名稱、繳費日;金額每月出帳後才填</li>
+            </ul>
+
+            <p><strong>每月操作</strong></p>
+            <ol>
+              <li>每月自動產生本期帳單;首頁頂部會提醒未繳與逾期</li>
+              <li>信用卡出帳後 → 填入實際應繳金額</li>
+              <li>繳費後 → 按繳費輸入金額(預設全額,可部分繳清)</li>
+              <li>部分繳清的餘額自動滾入下期並顯示警示</li>
+            </ol>
+
+            <p><strong>注意</strong>:卡費繳納不記入支出(刷卡時已逐筆記過);管理費等若開啟同步記支出,繳費時會自動產生一筆支出記錄。</p>
+
+            <svg class="usage-diagram" viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
+              <rect x="20" y="10" width="260" height="50" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
+              <rect x="35" y="25" width="72" height="20" rx="10" fill="#8e8e93"/>
+              <text x="71" y="39" text-anchor="middle" font-size="10" fill="#ffffff">待填金額</text>
+              <text x="117" y="39" font-size="11" fill="#1c1c1e">信用卡出帳前</text>
+
+              <line x1="150" y1="62" x2="150" y2="83" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+
+              <rect x="20" y="86" width="260" height="50" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
+              <rect x="35" y="101" width="60" height="20" rx="10" fill="#ff3b30"/>
+              <text x="65" y="115" text-anchor="middle" font-size="10" fill="#ffffff">未繳</text>
+              <text x="105" y="115" font-size="11" fill="#1c1c1e">填入 $28,000</text>
+
+              <line x1="150" y1="138" x2="150" y2="159" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+
+              <rect x="20" y="162" width="260" height="50" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
+              <rect x="35" y="177" width="72" height="20" rx="10" fill="#ff9500"/>
+              <text x="71" y="191" text-anchor="middle" font-size="10" fill="#ffffff">部分繳納</text>
+              <text x="117" y="191" font-size="11" fill="#1c1c1e">繳 $20,000</text>
+
+              <line x1="150" y1="214" x2="150" y2="235" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+
+              <rect x="20" y="238" width="260" height="70" rx="12" fill="#fff3e0" stroke="#ffcc80" stroke-width="2"/>
+              <text x="35" y="260" font-size="12" fill="#b25e00" font-weight="bold">⚠️ 滾入下期</text>
+              <text x="35" y="280" font-size="11" fill="#1c1c1e">未繳 $8,000 併入下期帳單</text>
+              <text x="35" y="297" font-size="10" fill="#8e8e93">下期顯示：本期+上期未繳=應繳</text>
+
+              <defs>
+                <marker id="arrow2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#8e8e93"/>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </div>
+
+        <div class="usage-section">
+          <button type="button" class="usage-section-toggle" data-target="usage-investment">📈 投資頁 — 持股總覽 <span class="accordion-arrow">▾</span></button>
+          <div class="usage-section-body" id="usage-investment">
+            <p><strong>這一頁做什麼</strong>:記錄股票/ETF 持股與損益。</p>
+            <ul>
+              <li>手動新增:名稱、股數、成本價、現價</li>
+              <li>快速更新:券商 App 庫存截圖交給 Claude 轉成備份檔 → 設定頁匯入合併,不用逐筆改</li>
+              <li>可保存庫存截圖作為對照</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="usage-section">
+          <button type="button" class="usage-section-toggle" data-target="usage-settings">⚙️ 設定頁 — 備份與管理 <span class="accordion-arrow">▾</span></button>
+          <div class="usage-section-body" id="usage-settings">
+            <p><strong>這一頁做什麼</strong>:資料備份、類別管理、使用說明。</p>
+
+            <p><strong>備份(最重要)</strong></p>
+            <ul>
+              <li>所有資料只存在這台裝置的瀏覽器,<strong>不會自動上傳</strong></li>
+              <li>定期「匯出並分享備份檔」存到 iCloud;超過 7 天未備份會提醒</li>
+              <li>換機/誤刪 → 匯入備份檔合併還原(不覆蓋、不重複)</li>
+            </ul>
+
+            <p><strong>建議的月度節奏</strong><br>
+            平日快速記現金消費 → 月底:匯入信用卡 CSV 並批次分類分帳 → 帳單頁填卡費、繳費打勾 → 分帳總覽結清已收還款 → 匯出備份。</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card">
+      <button type="button" class="accordion-toggle" data-target="changelogBody">🕐 改版歷程 <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="changelogBody"></div>
     </div>
 
     <div class="card">
@@ -3479,6 +3746,35 @@
     if (e.target.id === 'lightbox') closeLightbox();
   });
 
+  // ================= SETTINGS: ACCORDIONS (usage guide / changelog) =================
+  el('page-settings').addEventListener('click', (e) => {
+    const btn = e.target.closest('.accordion-toggle, .usage-section-toggle');
+    if (!btn) return;
+    const target = el(btn.dataset.target);
+    if (!target) return;
+    const isOpen = target.classList.toggle('open');
+    btn.classList.toggle('expanded', isOpen);
+  });
+
+  // Add a new entry to the TOP of this list every time a future update ships.
+  const CHANGELOG = [
+    { date: '2026-07-05', version: 'v2.3', title: '設定頁使用說明與改版歷程', desc: '新增按分頁分節的使用說明與線框示意圖、改版歷程列表；記帳頁批次匯入/分帳總覽改為預設收合。' },
+    { date: '2026-07-05', version: 'v2.2', title: '分帳強化與應繳帳單', desc: '結清邏輯修正(不再產生收入記錄，含舊資料遷移)、按對象彙總與部分還款、手動欠款、匯入預覽批次分類/批次分帳/重複偵測、全新應繳帳單模組、備份格式 v2。' },
+    { date: '2026-07-04', version: 'v2.1', title: '分帳功能', desc: '記帳內建分帳(我代墊/對方代墊、自動平分、多對象)、分帳總覽(待結/已結清)、對象名稱自動建議。' },
+    { date: '2026-07-03', version: 'v2.0', title: '快速記帳與資料安全', desc: '輸入優先版面(點類別即記錄)、7 天備份提醒、批次匯入信用卡 CSV、PWA。' },
+    { date: '2026-07-01', version: 'v1.0', title: '初版上線', desc: '收支記錄、類別管理、本月支出比例、每月損益表、投資組合、備份匯出/匯入。' }
+  ];
+
+  function renderChangelog() {
+    el('changelogBody').innerHTML = CHANGELOG.map(c => `
+      <div class="changelog-item">
+        <span class="changelog-version">${escapeHtml(c.version)}</span><span class="changelog-date">${c.date}</span>
+        <div class="changelog-title">${escapeHtml(c.title)}</div>
+        <div class="changelog-desc">${escapeHtml(c.desc)}</div>
+      </div>
+    `).join('');
+  }
+
   // ================= SETTINGS / BACKUP =================
   function renderSettingsSummary() {
     const wrap = el('settingsSummary');
@@ -4107,6 +4403,7 @@
   el('splitFieldWrap').style.display = currentType === 'expense' ? 'block' : 'none';
   renderLedger();
   renderSettingsSummary();
+  renderChangelog();
   checkBackupReminder();
   checkLegacySplitIncomeMigration();
   generateBillInstancesIfNeeded();
