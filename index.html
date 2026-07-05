@@ -1252,6 +1252,8 @@
   const REMINDER_DISMISSED_KEY = 'expenseTrackerReminderDismissedDate';
   const MANUAL_DEBT_KEY = 'expenseTrackerManualDebts';
   const LEGACY_SPLIT_INCOME_HANDLED_KEY = 'expenseTrackerLegacySplitIncomeHandled';
+  const BILL_TEMPLATES_KEY = 'expenseTrackerBillTemplates';
+  const BILL_INSTANCES_KEY = 'expenseTrackerBillInstances';
 
   const DEFAULT_CATEGORIES = {
     expense: [
@@ -2428,7 +2430,10 @@
     sel.innerHTML = getCategories(type).map(c => `<option value="${escapeHtml(c.key)}">${c.icon} ${escapeHtml(c.key)}</option>`).join('');
     if ([...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
   }
-  el('csvType').addEventListener('change', populateCsvCategories);
+  el('csvType').addEventListener('change', () => {
+    populateCsvCategories();
+    if (csvRows.length > 0) renderCsvPreview();
+  });
 
   function parseCSVLine(line) {
     const result = [];
@@ -2508,9 +2513,27 @@
       const date = parseDateFlexible(cols[dateIdx] || '');
       const note = noteIdx >= 0 ? (cols[noteIdx] || '') : '';
       const amount = parseAmountFlexible(cols[amountIdx] || '');
-      rows.push({ date, note, amount, valid: !!date && !isNaN(amount) && amount !== 0 });
+      const valid = !!date && !isNaN(amount) && amount !== 0;
+      rows.push({ date, note, amount, valid, category: null, duplicate: false });
     }
     return rows;
+  }
+
+  function isDuplicateOfExisting(row) {
+    const amt = Math.abs(row.amount);
+    const noteNorm = (row.note || '').trim();
+    return records.some(r => {
+      if (r.date !== row.date) return false;
+      if ((r.note || '').trim() !== noteNorm) return false;
+      const compareAmt = r.split ? r.split.totalAmount : r.amount;
+      return Math.abs(compareAmt - amt) < 0.01;
+    });
+  }
+
+  function csvRowEffectiveType(row) {
+    const globalType = el('csvType').value;
+    const flip = row.amount < 0;
+    return flip ? (globalType === 'expense' ? 'income' : 'expense') : globalType;
   }
 
   el('csvImportBtn').addEventListener('click', () => el('csvFile').click());
@@ -2535,6 +2558,9 @@
     reader.onload = (ev) => {
       const text = decodeCsvBuffer(ev.target.result);
       csvRows = parseCSV(text);
+      csvRows.forEach(row => {
+        if (row.valid) row.duplicate = isDuplicateOfExisting(row);
+      });
       csvCheckedIndices = new Set();
       csvPage = 1;
       renderCsvPreview();
@@ -2665,6 +2691,82 @@
     updateSummary();
     wrap.appendChild(summary);
 
+    // ---- Toolbar: select all / none ----
+    const toolbar = document.createElement('label');
+    toolbar.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px;';
+    const allValidIndices = csvRows.map((r, i) => i).filter(i => csvRows[i].valid);
+    toolbar.innerHTML = `<input type="checkbox" id="csvSelectAll" style="width:20px;height:20px;"> 全選 / 全不選(共 ${allValidIndices.length} 筆可匯入)`;
+    wrap.appendChild(toolbar);
+    const selectAllCb = toolbar.querySelector('#csvSelectAll');
+    selectAllCb.checked = allValidIndices.length > 0 && allValidIndices.every(i => csvCheckedIndices.has(i));
+    selectAllCb.addEventListener('change', () => {
+      if (selectAllCb.checked) allValidIndices.forEach(i => csvCheckedIndices.add(i));
+      else csvCheckedIndices.clear();
+      renderCsvPreview();
+    });
+
+    // ---- Toolbar: batch category apply ----
+    const batchCatWrap = document.createElement('div');
+    batchCatWrap.style.cssText = 'display:flex; gap:8px; margin-bottom:10px;';
+    const catOptionsHtml = getCategories(el('csvType').value).map(c => `<option value="${escapeHtml(c.key)}">${c.icon} ${escapeHtml(c.key)}</option>`).join('');
+    batchCatWrap.innerHTML = `
+      <select class="csv-batch-cat-select" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); font-size:13px;">${catOptionsHtml}</select>
+      <button type="button" class="submit-btn csv-batch-cat-apply" style="width:auto; padding:0 14px; flex-shrink:0;">套用類別到勾選列</button>
+    `;
+    wrap.appendChild(batchCatWrap);
+    batchCatWrap.querySelector('.csv-batch-cat-apply').addEventListener('click', () => {
+      if (csvCheckedIndices.size === 0) { showToast('請先勾選要套用的項目'); return; }
+      const chosenCat = batchCatWrap.querySelector('.csv-batch-cat-select').value;
+      const appliedCount = csvCheckedIndices.size;
+      csvCheckedIndices.forEach(idx => { if (csvRows[idx]) csvRows[idx].category = chosenCat; });
+      csvCheckedIndices = new Set();
+      showToast(`已將 ${appliedCount} 筆設為「${chosenCat}」`);
+      renderCsvPreview();
+    });
+
+    // ---- Toolbar: batch split apply ----
+    const batchSplitWrap = document.createElement('div');
+    batchSplitWrap.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;';
+    batchSplitWrap.innerHTML = `
+      <input type="text" class="csv-batch-split-name" placeholder="分帳對象姓名" list="splitNamesList" style="flex:1; min-width:120px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); font-size:13px;">
+      <select class="csv-batch-split-dir" style="padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); font-size:13px;">
+        <option value="receivable">我代墊</option>
+        <option value="payable">對方代墊</option>
+      </select>
+      <input type="number" class="csv-batch-split-pct" value="50" min="1" max="99" style="width:64px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); font-size:13px;">
+      <span style="align-self:center; font-size:12px; color:var(--sub-text);">% 算我的</span>
+      <button type="button" class="submit-btn btn-outline csv-batch-split-apply" style="width:100%;">🤝 套用分帳到勾選列(依各列金額計算)</button>
+    `;
+    wrap.appendChild(batchSplitWrap);
+    batchSplitWrap.querySelector('.csv-batch-split-apply').addEventListener('click', () => {
+      if (csvCheckedIndices.size === 0) { showToast('請先勾選要套用的項目'); return; }
+      const name = batchSplitWrap.querySelector('.csv-batch-split-name').value.trim();
+      if (!name) { showToast('請輸入分帳對象姓名'); return; }
+      const direction = batchSplitWrap.querySelector('.csv-batch-split-dir').value;
+      const pct = parseFloat(batchSplitWrap.querySelector('.csv-batch-split-pct').value) || 50;
+      const appliedCount = csvCheckedIndices.size;
+
+      csvCheckedIndices.forEach(idx => {
+        const row = csvRows[idx];
+        if (!row || !row.valid) return;
+        const fullAmt = Math.abs(row.amount);
+        const mine = Math.round(fullAmt * (pct / 100) * 100) / 100;
+        const remainder = Math.round((fullAmt - mine) * 100) / 100;
+        const cfg = ensureCsvSplitConfig(row);
+        cfg.enabled = true;
+        cfg.direction = direction;
+        cfg.mine = mine;
+        if (direction === 'receivable') {
+          cfg.participants = [{ name, amount: remainder }];
+        } else {
+          cfg.counterpartName = name;
+        }
+      });
+      csvCheckedIndices = new Set();
+      showToast(`已將分帳設定套用到 ${appliedCount} 筆`);
+      renderCsvPreview();
+    });
+
     const list = document.createElement('div');
     pageRows.forEach((row, i) => {
       const idx = startIdx + i;
@@ -2674,11 +2776,12 @@
       const line = document.createElement('div');
       line.className = 'csv-row';
       const warn = !row.valid ? ' <span style="color:var(--expense)">⚠️ 格式無法辨識</span>' : '';
+      const dupWarn = row.valid && row.duplicate ? ' <span style="color:#ff9500">⚠️ 疑似重複</span>' : '';
       const splitActive = row.splitConfig && row.splitConfig.enabled;
       line.innerHTML = `
         <input type="checkbox" class="csv-check" data-idx="${idx}" ${row.valid ? '' : 'disabled'} ${csvCheckedIndices.has(idx) ? 'checked' : ''}>
         <div class="csv-info">
-          <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}${warn}</div>
+          <div class="csv-desc">${row.note ? escapeHtml(row.note) : '(無說明)'}${warn}${dupWarn}</div>
           <div class="csv-date">${row.date || '日期無法辨識'}</div>
         </div>
         <div class="csv-amount" style="color:${row.amount < 0 ? 'var(--income)' : 'var(--expense)'}">${isNaN(row.amount) ? '-' : formatMoney(row.amount)}</div>
@@ -2691,6 +2794,22 @@
       rowWrap.appendChild(line);
 
       if (row.valid) {
+        const catField = document.createElement('div');
+        catField.style.cssText = 'padding: 0 0 10px 30px;';
+        const catSelect = document.createElement('select');
+        catSelect.className = 'csv-row-category';
+        catSelect.style.cssText = 'width:100%; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px;';
+        const rowType = csvRowEffectiveType(row);
+        const rowCats = getCategories(rowType);
+        if (!row.category || !rowCats.find(c => c.key === row.category)) {
+          const globalCat = el('csvCategory').value;
+          row.category = rowCats.find(c => c.key === globalCat) ? globalCat : (rowCats[0] ? rowCats[0].key : '');
+        }
+        catSelect.innerHTML = rowCats.map(c => `<option value="${escapeHtml(c.key)}" ${c.key === row.category ? 'selected' : ''}>${c.icon} ${escapeHtml(c.key)}</option>`).join('');
+        catSelect.addEventListener('change', () => { row.category = catSelect.value; });
+        catField.appendChild(catSelect);
+        rowWrap.appendChild(catField);
+
         const splitPanel = buildCsvSplitPanel(row);
         rowWrap.appendChild(splitPanel);
 
@@ -2744,10 +2863,12 @@
       const flip = row.amount < 0;
       const type = flip ? (globalType === 'expense' ? 'income' : 'expense') : globalType;
       const fullAmount = Math.abs(row.amount);
+      const rowCats = getCategories(type);
+      const category = row.category && rowCats.find(c => c.key === row.category) ? row.category : globalCategory;
       const record = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + count,
         type,
-        category: globalCategory,
+        category,
         amount: fullAmount,
         date: row.date
       };
