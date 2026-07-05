@@ -957,7 +957,7 @@
 
           <div class="field" id="payableNameWrap" style="display:none;">
             <label for="splitName">分帳對象(選填)</label>
-            <input type="text" id="splitName" placeholder="例如：小明">
+            <input type="text" id="splitName" placeholder="例如：小明" list="splitNamesList">
           </div>
         </div>
       </div>
@@ -1124,6 +1124,7 @@
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+<datalist id="splitNamesList"></datalist>
 
 <!-- Lightbox for screenshots -->
 <div class="lightbox" id="lightbox">
@@ -1468,7 +1469,7 @@
     const row = document.createElement('div');
     row.className = 'participant-row';
     row.innerHTML = `
-      <input type="text" class="participant-name" placeholder="姓名" value="${name ? escapeHtml(name) : ''}">
+      <input type="text" class="participant-name" placeholder="姓名" value="${name ? escapeHtml(name) : ''}" list="splitNamesList">
       <input type="number" class="participant-amount" placeholder="金額" min="0" step="0.01" value="${amount || ''}">
       <button type="button" class="participant-remove">×</button>
     `;
@@ -2021,12 +2022,28 @@
     renderLedger();
   }
 
+  function refreshSplitNamesList() {
+    const names = new Set();
+    records.forEach(r => {
+      if (!r.split) return;
+      if (r.split.direction === 'payable') {
+        if (r.split.counterpartName) names.add(r.split.counterpartName);
+      } else {
+        (r.split.participants || []).forEach(p => {
+          if (p.name) names.add(p.name);
+        });
+      }
+    });
+    el('splitNamesList').innerHTML = [...names].map(n => `<option value="${escapeHtml(n)}">`).join('');
+  }
+
   function renderLedger() {
     renderSummary();
     renderChart();
     populateMonthFilter();
     renderHistory();
     renderSplitsOverview();
+    refreshSplitNamesList();
   }
 
   // ================= CSV IMPORT =================
@@ -2206,7 +2223,7 @@
         const pRow = document.createElement('div');
         pRow.className = 'participant-row';
         pRow.innerHTML = `
-          <input type="text" class="participant-name" placeholder="姓名" value="${escapeHtml(p.name || '')}">
+          <input type="text" class="participant-name" placeholder="姓名" value="${escapeHtml(p.name || '')}" list="splitNamesList">
           <input type="number" class="participant-amount" placeholder="金額" min="0" step="0.01" value="${p.amount || ''}">
           <button type="button" class="participant-remove">×</button>
         `;
@@ -2232,7 +2249,7 @@
     payableWrap.style.display = cfg.direction === 'payable' ? 'block' : 'none';
     payableWrap.innerHTML = `
       <label>分帳對象(選填)</label>
-      <input type="text" class="csv-split-name" placeholder="例如：小明" value="${escapeHtml(cfg.counterpartName || '')}">
+      <input type="text" class="csv-split-name" placeholder="例如：小明" value="${escapeHtml(cfg.counterpartName || '')}" list="splitNamesList">
     `;
     payableWrap.querySelector('.csv-split-name').addEventListener('input', (e) => { cfg.counterpartName = e.target.value; });
     panel.appendChild(payableWrap);
