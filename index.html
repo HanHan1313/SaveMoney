@@ -3916,21 +3916,19 @@
       const remaining = billRemaining(inst);
       const carryWarning = tpl.amountType === 'variable' && inst.carriedOver > 0
         ? `<div class="bill-carry-warning">⚠️ 含上期未繳 ${formatMoney(inst.carriedOver)} 滾入，請留意循環利息</div>` : '';
-      const statementDue = tpl.statementDay != null ? computeDueDate(inst.period, tpl.statementDay) : null;
-      const statementWarning = (inst.status === 'pending_amount' && statementDue && todayStr() > statementDue)
-        ? `<div class="bill-carry-warning">⏰ 已過結帳日(${statementDue})，該填入本期帳單金額了</div>` : '';
+      const noteHtml = tpl.note ? `<div class="history-note">${escapeHtml(tpl.note)}</div>` : '';
 
       card.innerHTML = `
         <div class="bill-card-top">
           <div class="bill-name">${escapeHtml(tpl.name)}</div>
           <div class="bill-status-badge ${inst.status}">${statusLabel(inst.status)}</div>
         </div>
+        ${noteHtml}
         <div class="bill-sub">
           ${inst.billedAmount === null ? '本期帳單：待填金額' : `本期帳單 ${formatMoney(inst.billedAmount)}${inst.carriedOver > 0 ? ' + 上期未繳 ' + formatMoney(inst.carriedOver) : ''} = 應繳 ${formatMoney(totalDue)}`}
           ・已繳 ${formatMoney(paid)} ・截止 ${inst.dueDate}
         </div>
         ${carryWarning}
-        ${statementWarning}
       `;
 
       if (inst.status === 'pending_amount') {
@@ -4027,8 +4025,8 @@
         <input type="number" id="billTplDueDay" min="1" max="31" placeholder="例如 15">
       </div>
       <div class="field">
-        <label>結帳日(選填，僅提醒填金額用)</label>
-        <input type="number" id="billTplStatementDay" min="1" max="31" placeholder="例如 5">
+        <label>備註(選填)</label>
+        <input type="text" id="billTplNote" placeholder="例如：自動扣款帳戶末四碼1234">
       </div>
       <div class="field">
         <label class="checkbox-label">
@@ -4059,8 +4057,7 @@
     el('billTplSubmitBtn').addEventListener('click', () => {
       const name = el('billTplName').value.trim();
       const dueDay = parseInt(el('billTplDueDay').value, 10);
-      const statementDayRaw = el('billTplStatementDay').value;
-      const statementDay = statementDayRaw ? parseInt(statementDayRaw, 10) : null;
+      const note = el('billTplNote').value.trim();
       const createExpenseRecord = el('billTplCreateExpense').checked;
       const category = createExpenseRecord ? el('billTplCategory').value : null;
       const defaultAmount = amountType === 'fixed' ? parseFloat(el('billTplDefaultAmount').value) : 0;
@@ -4075,7 +4072,7 @@
         amountType,
         defaultAmount: amountType === 'fixed' ? defaultAmount : 0,
         dueDay,
-        statementDay,
+        note: note || undefined,
         category,
         createExpenseRecord,
         active: true
