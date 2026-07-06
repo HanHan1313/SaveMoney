@@ -1610,6 +1610,15 @@
     </div>
 
     <div class="card">
+      <button type="button" class="accordion-toggle" data-target="categoryRulesBody">🏷️ 分類規則 <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="categoryRulesBody">
+        <div class="settings-desc">記帳與匯入時，符合這些關鍵字的商家說明會自動預選對應類別(仍可手動修改)。</div>
+        <div id="categoryRulesList"></div>
+        <button type="button" class="submit-btn btn-danger" id="clearCategoryRulesBtn" style="margin-top:12px;">🗑️ 清除所有分類規則</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>備份與還原</h2>
       <div class="settings-desc">資料只存在這個瀏覽器裡，手機和電腦不會自動同步。匯出備份檔後傳到另一台裝置匯入，就能把兩邊的紀錄合併在一起(不會覆蓋、也不會重複)。</div>
       <button type="button" class="submit-btn" id="exportBtn">📤 匯出並分享備份檔</button>
@@ -1658,6 +1667,7 @@
   const LEGACY_SPLIT_INCOME_HANDLED_KEY = 'expenseTrackerLegacySplitIncomeHandled';
   const BILL_TEMPLATES_KEY = 'expenseTrackerBillTemplates';
   const BILL_INSTANCES_KEY = 'expenseTrackerBillInstances';
+  const CATEGORY_RULES_KEY = 'expenseTrackerCategoryRules';
 
   const DEFAULT_CATEGORIES = {
     expense: [
@@ -1688,6 +1698,7 @@
   let manualDebts = loadJSON(MANUAL_DEBT_KEY, []);
   let billTemplates = loadJSON(BILL_TEMPLATES_KEY, []);
   let billInstances = loadJSON(BILL_INSTANCES_KEY, []);
+  let categoryRules = loadJSON(CATEGORY_RULES_KEY, { expense: {}, income: {} });
   let currentType = 'expense';
   let currentCategory = null;
   let splitDirection = 'receivable';
@@ -1719,6 +1730,44 @@
   function saveManualDebts() { save(MANUAL_DEBT_KEY, manualDebts); }
   function saveBillTemplates() { save(BILL_TEMPLATES_KEY, billTemplates); }
   function saveBillInstances() { save(BILL_INSTANCES_KEY, billInstances); }
+  function saveCategoryRules() { save(CATEGORY_RULES_KEY, categoryRules); }
+
+  // ================= CATEGORY LEARNING (merchant keyword -> category) =================
+  // Extracts a merchant keyword from a transaction description:
+  // 1. Strip known payment-app prefixes (連支＊/連加＊/全支付) if present.
+  // 2. Take the leading segment up to the first separator (－ - ( （ or whitespace).
+  // 3. If that segment is shorter than 2 characters, fall back to the first 4 characters
+  //    of the (prefix-stripped) string instead.
+  function extractMerchantKeyword(note) {
+    if (!note) return '';
+    let s = note.trim();
+    const paymentPrefixes = ['連支＊', '連加＊', '全支付'];
+    for (const p of paymentPrefixes) {
+      if (s.startsWith(p)) { s = s.slice(p.length); break; }
+    }
+    const m = s.match(/^([^\s\-－(（]+)/);
+    let keyword = m ? m[1] : s;
+    if (keyword.length < 2) keyword = s.slice(0, 4);
+    return keyword.trim();
+  }
+
+  function learnCategoryRule(type, note, category) {
+    const keyword = extractMerchantKeyword(note);
+    if (!keyword || !category) return;
+    categoryRules[type] = categoryRules[type] || {};
+    categoryRules[type][keyword] = category;
+    saveCategoryRules();
+    renderCategoryRulesList();
+  }
+
+  function matchCategoryRule(type, note) {
+    if (!note) return null;
+    const rules = categoryRules[type] || {};
+    const keys = Object.keys(rules).filter(k => note.includes(k));
+    if (keys.length === 0) return null;
+    keys.sort((a, b) => b.length - a.length);
+    return rules[keys[0]];
+  }
   function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   function bumpCategoryUsage(type, key) {
@@ -2166,6 +2215,18 @@
   el('date').value = todayStr();
   syncDateQuickButtons();
 
+  // Suggest a category from learned merchant rules as the note is typed (still changeable).
+  el('note').addEventListener('input', () => {
+    const noteVal = el('note').value.trim();
+    const match = matchCategoryRule(currentType, noteVal);
+    if (!match) return;
+    const cats = getCategories(currentType);
+    if (cats.find(c => c.key === match)) {
+      currentCategory = match;
+      renderCategoryGrid();
+    }
+  });
+
   function commitQuickEntry(categoryKey) {
     const amount = parseFloat(el('amount').value);
     const date = el('date').value;
@@ -2242,12 +2303,16 @@
     bumpCategoryUsage(currentType, categoryKey);
 
     if (isEditing) {
+      const originalCategory = existing.category;
       existing.type = draft.type;
       existing.category = draft.category;
       existing.amount = draft.amount;
       existing.date = draft.date;
       if (draft.note) existing.note = draft.note; else delete existing.note;
       if (draft.split) existing.split = draft.split; else delete existing.split;
+      if (originalCategory !== draft.category) {
+        learnCategoryRule(draft.type, draft.note, draft.category);
+      }
     } else {
       draft.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       records.push(draft);
@@ -3036,7 +3101,10 @@
         if (row.csvCategoryRaw && row.csvCategoryRaw !== '未分類') {
           const rowType = csvRowEffectiveType(row);
           const matched = getCategories(rowType).find(c => c.key === row.csvCategoryRaw);
-          if (matched) row.category = matched.key;
+          if (matched) {
+            row.category = matched.key;
+            learnCategoryRule(rowType, row.note, matched.key);
+          }
         }
       });
       csvCheckedIndices = new Set();
@@ -3224,7 +3292,12 @@
       if (csvCheckedIndices.size === 0) { showToast('請先勾選要套用的項目'); return; }
       const chosenCat = batchCatWrap.querySelector('.csv-batch-cat-select').value;
       const appliedCount = csvCheckedIndices.size;
-      csvCheckedIndices.forEach(idx => { if (csvRows[idx]) csvRows[idx].category = chosenCat; });
+      csvCheckedIndices.forEach(idx => {
+        const row = csvRows[idx];
+        if (!row) return;
+        row.category = chosenCat;
+        learnCategoryRule(csvRowEffectiveType(row), row.note, chosenCat);
+      });
       csvCheckedIndices = new Set();
       showToast(`已將 ${appliedCount} 筆設為「${chosenCat}」`);
       renderCsvPreview();
@@ -3310,11 +3383,19 @@
         const rowType = csvRowEffectiveType(row);
         const rowCats = getCategories(rowType);
         if (!row.category || !rowCats.find(c => c.key === row.category)) {
-          const globalCat = el('csvCategory').value;
-          row.category = rowCats.find(c => c.key === globalCat) ? globalCat : (rowCats[0] ? rowCats[0].key : '');
+          const ruleMatch = matchCategoryRule(rowType, row.note);
+          if (ruleMatch && rowCats.find(c => c.key === ruleMatch)) {
+            row.category = ruleMatch;
+          } else {
+            const globalCat = el('csvCategory').value;
+            row.category = rowCats.find(c => c.key === globalCat) ? globalCat : (rowCats[0] ? rowCats[0].key : '');
+          }
         }
         catSelect.innerHTML = rowCats.map(c => `<option value="${escapeHtml(c.key)}" ${c.key === row.category ? 'selected' : ''}>${c.icon} ${escapeHtml(c.key)}</option>`).join('');
-        catSelect.addEventListener('change', () => { row.category = catSelect.value; });
+        catSelect.addEventListener('change', () => {
+          row.category = catSelect.value;
+          learnCategoryRule(rowType, row.note, catSelect.value);
+        });
         catField.appendChild(catSelect);
         rowWrap.appendChild(catField);
 
@@ -3865,6 +3946,9 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-05', version: 'v2.6', title: '分類規則學習', desc: '記帳、編輯記錄、CSV 匯入(逐列/批次/第4欄類別)設定類別時自動學習「商家關鍵字→類別」規則；後續記帳與匯入自動預選(仍可修改)；設定頁可檢視/刪除規則，備份格式 v3。' },
+    { date: '2026-07-05', version: 'v2.5', title: 'CSV 匯入支援選填類別欄', desc: 'CSV 可選擇性帶第 4 欄「類別」，比對現有類別後直接預填該列類別(仍可修改)；無此欄的三欄 CSV 完全不受影響。' },
+    { date: '2026-07-05', version: 'v2.4', title: '分帳金額自動計算', desc: '手動記帳與 CSV 匯入分帳面板：「你的花費」變動時自動平分剩餘金額給分帳對象；手動改某人金額後只重算其餘未手動指定者；金額一律取整數。' },
     { date: '2026-07-05', version: 'v2.3', title: '設定頁使用說明與改版歷程', desc: '新增按分頁分節的使用說明與線框示意圖、改版歷程列表；記帳頁批次匯入/分帳總覽改為預設收合。' },
     { date: '2026-07-05', version: 'v2.2', title: '分帳強化與應繳帳單', desc: '結清邏輯修正(不再產生收入記錄，含舊資料遷移)、按對象彙總與部分還款、手動欠款、匯入預覽批次分類/批次分帳/重複偵測、全新應繳帳單模組、備份格式 v2。' },
     { date: '2026-07-04', version: 'v2.1', title: '分帳功能', desc: '記帳內建分帳(我代墊/對方代墊、自動平分、多對象)、分帳總覽(待結/已結清)、對象名稱自動建議。' },
@@ -3882,6 +3966,48 @@
     `).join('');
   }
 
+  function renderCategoryRulesList() {
+    const wrap = el('categoryRulesList');
+    if (!wrap) return;
+    const entries = [];
+    ['expense', 'income'].forEach(type => {
+      Object.entries(categoryRules[type] || {}).forEach(([keyword, category]) => {
+        entries.push({ type, keyword, category });
+      });
+    });
+
+    if (entries.length === 0) {
+      wrap.innerHTML = '<div class="empty-note">尚無已學習的分類規則</div>';
+      return;
+    }
+
+    wrap.innerHTML = '';
+    entries.forEach(({ type, keyword, category }) => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = `
+        <div class="history-info">
+          <div class="history-category">${escapeHtml(keyword)} → ${escapeHtml(category)}</div>
+          <div class="history-date">${type === 'expense' ? '支出' : '收入'}</div>
+        </div>
+        <button class="delete-btn" aria-label="刪除">✕</button>
+      `;
+      item.querySelector('.delete-btn').addEventListener('click', () => {
+        delete categoryRules[type][keyword];
+        saveCategoryRules();
+        renderCategoryRulesList();
+      });
+      wrap.appendChild(item);
+    });
+  }
+
+  el('clearCategoryRulesBtn').addEventListener('click', () => {
+    if (!confirm('確定要清除所有已學習的分類規則嗎？此動作無法復原。')) return;
+    categoryRules = { expense: {}, income: {} };
+    saveCategoryRules();
+    renderCategoryRulesList();
+  });
+
   // ================= SETTINGS / BACKUP =================
   function renderSettingsSummary() {
     const wrap = el('settingsSummary');
@@ -3896,7 +4022,7 @@
     `;
   }
 
-  const BACKUP_VERSION = 2;
+  const BACKUP_VERSION = 3;
 
   function buildBackup() {
     return {
@@ -3910,7 +4036,8 @@
       categoryUsage,
       manualDebts,
       billTemplates,
-      billInstances
+      billInstances,
+      categoryRules
     };
   }
 
@@ -3999,7 +4126,7 @@
     }
 
     let addedRecords = 0, addedInvestments = 0, addedScreenshots = 0, addedCategories = 0,
-        addedDebts = 0, addedBillTemplates = 0, addedBillInstances = 0;
+        addedDebts = 0, addedBillTemplates = 0, addedBillInstances = 0, addedCategoryRules = 0;
 
     if (Array.isArray(data.records)) {
       const existingIds = new Set(records.map(r => r.id));
@@ -4095,6 +4222,20 @@
       });
     }
 
+    if (data.categoryRules) {
+      ['expense', 'income'].forEach(type => {
+        const incoming = data.categoryRules[type];
+        if (!incoming || typeof incoming !== 'object') return;
+        categoryRules[type] = categoryRules[type] || {};
+        Object.keys(incoming).forEach(keyword => {
+          if (!(keyword in categoryRules[type])) {
+            categoryRules[type][keyword] = incoming[keyword];
+            addedCategoryRules++;
+          }
+        });
+      });
+    }
+
     saveRecords();
     saveCustomCategories();
     saveInvestments();
@@ -4102,6 +4243,7 @@
     saveManualDebts();
     saveBillTemplates();
     saveBillInstances();
+    saveCategoryRules();
     try {
       saveScreenshots();
     } catch (err) {
@@ -4114,8 +4256,9 @@
       localStorage.setItem(LAST_BACKUP_KEY, String(new Date(data.exportedAt).getTime()));
     }
 
-    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單`);
+    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單、${addedCategoryRules} 條分類規則`);
 
+    renderCategoryRulesList();
     renderCategoryGrid();
     renderLedger();
     renderInvestments();
@@ -4138,6 +4281,7 @@
     manualDebts = [];
     billTemplates = [];
     billInstances = [];
+    categoryRules = { expense: {}, income: {} };
     saveRecords();
     saveCustomCategories();
     saveInvestments();
@@ -4146,6 +4290,7 @@
     saveManualDebts();
     saveBillTemplates();
     saveBillInstances();
+    saveCategoryRules();
 
     renderCategoryGrid();
     renderLedger();
@@ -4153,6 +4298,7 @@
     renderSettingsSummary();
     renderBillsPage();
     checkBillsReminder();
+    renderCategoryRulesList();
   });
 
   // ================= BILLS (功能二) =================
@@ -4511,6 +4657,7 @@
   renderLedger();
   renderSettingsSummary();
   renderChangelog();
+  renderCategoryRulesList();
   checkBackupReminder();
   checkLegacySplitIncomeMigration();
   generateBillInstancesIfNeeded();
