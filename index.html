@@ -2953,6 +2953,7 @@
     const dateKeys = ['日期', 'date', '交易日期', '消費日期'];
     const noteKeys = ['說明', '描述', '備註', 'description', '商店', '摘要', '消費項目', 'note'];
     const amountKeys = ['金額', 'amount', '消費金額', 'ntd', '台幣'];
+    const categoryKeys = ['類別', 'category', '分類'];
 
     function findIdx(keys) {
       for (const k of keys) {
@@ -2965,10 +2966,13 @@
     let dateIdx = findIdx(dateKeys);
     let noteIdx = findIdx(noteKeys);
     let amountIdx = findIdx(amountKeys);
+    let categoryIdx = findIdx(categoryKeys);
     let startRow = 1;
 
     if (dateIdx === -1 && noteIdx === -1 && amountIdx === -1) {
-      dateIdx = 0; noteIdx = 1; amountIdx = 2; startRow = 0;
+      dateIdx = 0; noteIdx = 1; amountIdx = 2;
+      if (categoryIdx === -1 && header.length > 3) categoryIdx = 3;
+      startRow = 0;
     } else {
       if (dateIdx === -1) dateIdx = 0;
       if (amountIdx === -1) amountIdx = header.length - 1;
@@ -2981,7 +2985,8 @@
       const note = noteIdx >= 0 ? (cols[noteIdx] || '') : '';
       const amount = parseAmountFlexible(cols[amountIdx] || '');
       const valid = !!date && !isNaN(amount) && amount !== 0;
-      rows.push({ date, note, amount, valid, category: null, duplicate: false });
+      const csvCategoryRaw = categoryIdx >= 0 ? (cols[categoryIdx] || '').trim() : '';
+      rows.push({ date, note, amount, valid, category: null, csvCategoryRaw, duplicate: false });
     }
     return rows;
   }
@@ -3026,7 +3031,13 @@
       const text = decodeCsvBuffer(ev.target.result);
       csvRows = parseCSV(text);
       csvRows.forEach(row => {
-        if (row.valid) row.duplicate = isDuplicateOfExisting(row);
+        if (!row.valid) return;
+        row.duplicate = isDuplicateOfExisting(row);
+        if (row.csvCategoryRaw && row.csvCategoryRaw !== '未分類') {
+          const rowType = csvRowEffectiveType(row);
+          const matched = getCategories(rowType).find(c => c.key === row.csvCategoryRaw);
+          if (matched) row.category = matched.key;
+        }
       });
       csvCheckedIndices = new Set();
       csvPage = 1;
