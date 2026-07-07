@@ -2231,8 +2231,12 @@
     const amount = parseFloat(el('amount').value);
     const date = el('date').value;
     const note = el('note').value.trim();
+    // "你的花費" can legitimately be 0 when fully advancing a bill for someone else
+    // (split enabled, receivable, participants covering the whole amount) — only
+    // block zero/blank amount for a normal, non-split entry.
+    const splitEnabled = currentType === 'expense' && el('splitToggle').checked;
 
-    if (!amount || amount <= 0) {
+    if (isNaN(amount) || amount < 0 || (amount === 0 && !splitEnabled)) {
       el('amount').focus();
       showToast('請先輸入金額');
       return;
@@ -3466,7 +3470,8 @@
       const cfg = row.splitConfig;
       if (type === 'expense' && cfg && cfg.enabled) {
         const mine = parseFloat(cfg.mine);
-        if (isNaN(mine) || mine <= 0 || mine > fullAmount) {
+        // mine === 0 is valid: fully advancing the bill for someone else.
+        if (isNaN(mine) || mine < 0 || mine > fullAmount) {
           skipped++;
           return;
         }
