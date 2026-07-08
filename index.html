@@ -1028,6 +1028,45 @@
     border-bottom: 1px solid var(--border);
   }
   .bill-history-item:last-child { border-bottom: none; }
+  .bill-manage-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .bill-manage-row button {
+    flex: 1;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .bill-manage-row button.danger { color: var(--expense); }
+  .bill-inactive-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: rgba(142,142,147,0.15);
+    color: var(--sub-text);
+  }
+  .bill-edit-form {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .bill-edit-form.open { display: block; }
+  .bill-amounttype-locked {
+    font-size: 13px;
+    color: var(--sub-text);
+    padding: 10px;
+    background: var(--bg);
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
 
   /* ---- Accordions (usage guide / changelog) ---- */
   .accordion-toggle {
@@ -3951,6 +3990,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-08', version: 'v2.8', title: '應繳帳單:新增刪除/停用/編輯', desc: '每個帳單類型卡片新增編輯、停用/啟用、刪除功能。刪除會移除該類型的期別與繳費追蹤紀錄，但已產生的支出記錄一律保留；停用可逆，會保留歷史但不再產生新期別，之後可重新啟用。編輯可調整名稱/金額/截止日/備註/是否連動支出等基本欄位；若該類型已有期別產生，金額類型(固定/每期填寫)將鎖定不可更改。' },
     { date: '2026-07-05', version: 'v2.7', title: '修正:分帳「你的花費=0」被誤擋', desc: '手動記帳與 CSV 匯入分帳時，「你的花費」設為 0(全額代墊)原本會被驗證誤判為無效而整筆略過不匯入；已修正為只在非分帳情境才要求金額大於 0，兩條路徑行為一致。' },
     { date: '2026-07-05', version: 'v2.6', title: '分類規則學習', desc: '記帳、編輯記錄、CSV 匯入(逐列/批次/第4欄類別)設定類別時自動學習「商家關鍵字→類別」規則；後續記帳與匯入自動預選(仍可修改)；設定頁可檢視/刪除規則，備份格式 v3。' },
     { date: '2026-07-05', version: 'v2.5', title: 'CSV 匯入支援選填類別欄', desc: 'CSV 可選擇性帶第 4 欄「類別」，比對現有類別後直接預填該列類別(仍可修改)；無此欄的三欄 CSV 完全不受影響。' },
@@ -4462,6 +4502,120 @@
     return { paid: '已繳', unpaid: '未繳', partial: '部分繳納', pending_amount: '待填金額' }[status] || status;
   }
 
+  function deleteBillTemplate(templateId) {
+    const tpl = billTemplates.find(t => t.id === templateId);
+    if (!tpl) return;
+    if (!confirm(`確定要刪除帳單類型「${tpl.name}」嗎？\n\n這會一併移除這個類型底下所有期別與繳費追蹤紀錄，但已產生的支出記錄會保留，僅移除帳單追蹤本身。此動作無法復原。`)) return;
+
+    billTemplates = billTemplates.filter(t => t.id !== templateId);
+    billInstances = billInstances.filter(i => i.templateId !== templateId);
+    saveBillTemplates();
+    saveBillInstances();
+    showToast(`已刪除帳單類型「${tpl.name}」`);
+    renderBillsPage();
+    checkBillsReminder();
+  }
+
+  function toggleBillTemplateActive(templateId) {
+    const tpl = billTemplates.find(t => t.id === templateId);
+    if (!tpl) return;
+    if (tpl.active) {
+      if (!confirm(`停用「${tpl.name}」後不會再自動產生新一期的帳單，但歷史紀錄會保留，之後可以隨時重新啟用。確定要停用嗎？`)) return;
+      tpl.active = false;
+      showToast(`已停用「${tpl.name}」`);
+    } else {
+      tpl.active = true;
+      showToast(`已重新啟用「${tpl.name}」`);
+    }
+    saveBillTemplates();
+    generateBillInstancesIfNeeded();
+    renderBillsPage();
+    checkBillsReminder();
+  }
+
+  function buildBillEditForm(tpl, container) {
+    const hasInstances = billInstances.some(i => i.templateId === tpl.id);
+    const expenseCats = getCategories('expense');
+    const amountTypeHtml = hasInstances
+      ? `<div class="bill-amounttype-locked">金額類型:${tpl.amountType === 'fixed' ? '固定金額' : '每期填寫'}(已有期別產生，無法變更)</div>`
+      : `<div class="type-toggle" id="editAmountType-${tpl.id}">
+           <button type="button" class="${tpl.amountType === 'fixed' ? 'active' : ''}" data-type="fixed">固定金額</button>
+           <button type="button" class="${tpl.amountType === 'variable' ? 'active' : ''}" data-type="variable">每期填寫(如信用卡)</button>
+         </div>`;
+
+    container.innerHTML = `
+      <div class="field">
+        <label>帳單名稱</label>
+        <input type="text" class="edit-tpl-name" value="${escapeHtml(tpl.name)}">
+      </div>
+      ${amountTypeHtml}
+      <div class="field edit-default-amount-wrap" style="${tpl.amountType === 'variable' ? 'display:none;' : ''}">
+        <label>每期金額</label>
+        <input type="number" class="edit-tpl-amount" min="0" step="0.01" value="${tpl.defaultAmount || 0}">
+      </div>
+      <div class="field">
+        <label>繳款截止日(每月第幾天，1-31)</label>
+        <input type="number" class="edit-tpl-dueday" min="1" max="31" value="${tpl.dueDay}">
+      </div>
+      <div class="field">
+        <label>備註(選填)</label>
+        <input type="text" class="edit-tpl-note" value="${escapeHtml(tpl.note || '')}">
+      </div>
+      <div class="field">
+        <label class="checkbox-label">
+          <input type="checkbox" class="edit-tpl-createexpense" ${tpl.createExpenseRecord ? 'checked' : ''}>
+          繳費時同步建立支出紀錄
+        </label>
+      </div>
+      <div class="field edit-category-wrap" style="${tpl.createExpenseRecord ? '' : 'display:none;'}">
+        <label>支出類別</label>
+        <select class="edit-tpl-category">${expenseCats.map(c => `<option value="${escapeHtml(c.key)}" ${c.key === tpl.category ? 'selected' : ''}>${c.icon} ${escapeHtml(c.key)}</option>`).join('')}</select>
+      </div>
+      <button type="button" class="submit-btn edit-tpl-save">儲存變更</button>
+    `;
+
+    let editingAmountType = tpl.amountType;
+    if (!hasInstances) {
+      container.querySelectorAll(`#editAmountType-${tpl.id} button`).forEach(btn => {
+        btn.addEventListener('click', () => {
+          container.querySelectorAll(`#editAmountType-${tpl.id} button`).forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          editingAmountType = btn.dataset.type;
+          container.querySelector('.edit-default-amount-wrap').style.display = editingAmountType === 'fixed' ? 'block' : 'none';
+        });
+      });
+    }
+    container.querySelector('.edit-tpl-createexpense').addEventListener('change', (e) => {
+      container.querySelector('.edit-category-wrap').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    container.querySelector('.edit-tpl-save').addEventListener('click', () => {
+      const name = container.querySelector('.edit-tpl-name').value.trim();
+      const dueDay = parseInt(container.querySelector('.edit-tpl-dueday').value, 10);
+      const note = container.querySelector('.edit-tpl-note').value.trim();
+      const createExpenseRecord = container.querySelector('.edit-tpl-createexpense').checked;
+      const category = createExpenseRecord ? container.querySelector('.edit-tpl-category').value : null;
+      const defaultAmount = editingAmountType === 'fixed' ? parseFloat(container.querySelector('.edit-tpl-amount').value) : 0;
+
+      if (!name) { showToast('請輸入帳單名稱'); return; }
+      if (!dueDay || dueDay < 1 || dueDay > 31) { showToast('請輸入正確的繳款截止日(1-31)'); return; }
+      if (editingAmountType === 'fixed' && (!defaultAmount || defaultAmount <= 0)) { showToast('請輸入每期金額'); return; }
+
+      tpl.name = name;
+      tpl.amountType = editingAmountType;
+      tpl.defaultAmount = editingAmountType === 'fixed' ? defaultAmount : 0;
+      tpl.dueDay = dueDay;
+      tpl.note = note || undefined;
+      tpl.createExpenseRecord = createExpenseRecord;
+      tpl.category = category;
+
+      saveBillTemplates();
+      showToast(`已更新「${name}」`);
+      renderBillsPage();
+      checkBillsReminder();
+    });
+  }
+
   function renderBillsPage() {
     const wrap = el('billCardsList');
     wrap.innerHTML = '';
@@ -4475,58 +4629,86 @@
 
     billTemplates.forEach(tpl => {
       const inst = billInstances.find(i => i.templateId === tpl.id && i.period === todayYm);
-      if (!inst) return;
+      const noteHtml = tpl.note ? `<div class="history-note">${escapeHtml(tpl.note)}</div>` : '';
 
       const card = document.createElement('div');
       card.className = 'bill-card';
 
-      const totalDue = billTotalDue(inst);
-      const paid = billPaidAmount(inst);
-      const remaining = billRemaining(inst);
-      const carryWarning = tpl.amountType === 'variable' && inst.carriedOver > 0
-        ? `<div class="bill-carry-warning">⚠️ 含上期未繳 ${formatMoney(inst.carriedOver)} 滾入，請留意循環利息</div>` : '';
-      const noteHtml = tpl.note ? `<div class="history-note">${escapeHtml(tpl.note)}</div>` : '';
+      if (inst) {
+        const totalDue = billTotalDue(inst);
+        const paid = billPaidAmount(inst);
+        const remaining = billRemaining(inst);
+        const carryWarning = tpl.amountType === 'variable' && inst.carriedOver > 0
+          ? `<div class="bill-carry-warning">⚠️ 含上期未繳 ${formatMoney(inst.carriedOver)} 滾入，請留意循環利息</div>` : '';
 
-      card.innerHTML = `
-        <div class="bill-card-top">
-          <div class="bill-name">${escapeHtml(tpl.name)}</div>
-          <div class="bill-status-badge ${inst.status}">${statusLabel(inst.status)}</div>
-        </div>
-        ${noteHtml}
-        <div class="bill-sub">
-          ${inst.billedAmount === null ? '本期帳單：待填金額' : `本期帳單 ${formatMoney(inst.billedAmount)}${inst.carriedOver > 0 ? ' + 上期未繳 ' + formatMoney(inst.carriedOver) : ''} = 應繳 ${formatMoney(totalDue)}`}
-          ・已繳 ${formatMoney(paid)} ・截止 ${inst.dueDate}
-        </div>
-        ${carryWarning}
-      `;
+        card.innerHTML = `
+          <div class="bill-card-top">
+            <div class="bill-name">${escapeHtml(tpl.name)}</div>
+            <div class="bill-status-badge ${inst.status}">${statusLabel(inst.status)}</div>
+          </div>
+          ${noteHtml}
+          <div class="bill-sub">
+            ${inst.billedAmount === null ? '本期帳單：待填金額' : `本期帳單 ${formatMoney(inst.billedAmount)}${inst.carriedOver > 0 ? ' + 上期未繳 ' + formatMoney(inst.carriedOver) : ''} = 應繳 ${formatMoney(totalDue)}`}
+            ・已繳 ${formatMoney(paid)} ・截止 ${inst.dueDate}
+          </div>
+          ${carryWarning}
+        `;
 
-      if (inst.status === 'pending_amount') {
-        const row = document.createElement('div');
-        row.className = 'bill-action-row';
-        row.innerHTML = `
-          <input type="number" class="bill-fill-amount" placeholder="輸入本期帳單金額" min="0" step="0.01">
-          <button type="button" class="bill-fill-btn">確認金額</button>
+        if (inst.status === 'pending_amount') {
+          const row = document.createElement('div');
+          row.className = 'bill-action-row';
+          row.innerHTML = `
+            <input type="number" class="bill-fill-amount" placeholder="輸入本期帳單金額" min="0" step="0.01">
+            <button type="button" class="bill-fill-btn">確認金額</button>
+          `;
+          row.querySelector('.bill-fill-btn').addEventListener('click', () => {
+            const amt = parseFloat(row.querySelector('.bill-fill-amount').value);
+            if (!amt || amt <= 0) { showToast('請輸入金額'); return; }
+            setBillAmount(inst.id, amt);
+          });
+          card.appendChild(row);
+        } else if (inst.status !== 'paid') {
+          const row = document.createElement('div');
+          row.className = 'bill-action-row';
+          row.innerHTML = `
+            <input type="number" class="bill-pay-amount" min="0" step="0.01" value="${remaining}">
+            <button type="button" class="bill-pay-btn">繳費</button>
+          `;
+          row.querySelector('.bill-pay-btn').addEventListener('click', () => {
+            const amt = parseFloat(row.querySelector('.bill-pay-amount').value);
+            if (!amt || amt <= 0) { showToast('請輸入繳費金額'); return; }
+            recordBillPayment(inst.id, amt);
+          });
+          card.appendChild(row);
+        }
+      } else {
+        card.innerHTML = `
+          <div class="bill-card-top">
+            <div class="bill-name">${escapeHtml(tpl.name)}</div>
+            <div class="bill-inactive-badge">${tpl.active ? '尚未產生期別' : '已停用'}</div>
+          </div>
+          ${noteHtml}
         `;
-        row.querySelector('.bill-fill-btn').addEventListener('click', () => {
-          const amt = parseFloat(row.querySelector('.bill-fill-amount').value);
-          if (!amt || amt <= 0) { showToast('請輸入金額'); return; }
-          setBillAmount(inst.id, amt);
-        });
-        card.appendChild(row);
-      } else if (inst.status !== 'paid') {
-        const row = document.createElement('div');
-        row.className = 'bill-action-row';
-        row.innerHTML = `
-          <input type="number" class="bill-pay-amount" min="0" step="0.01" value="${remaining}">
-          <button type="button" class="bill-pay-btn">繳費</button>
-        `;
-        row.querySelector('.bill-pay-btn').addEventListener('click', () => {
-          const amt = parseFloat(row.querySelector('.bill-pay-amount').value);
-          if (!amt || amt <= 0) { showToast('請輸入繳費金額'); return; }
-          recordBillPayment(inst.id, amt);
-        });
-        card.appendChild(row);
       }
+
+      // Manage row: edit / activate-deactivate / delete
+      const manageRow = document.createElement('div');
+      manageRow.className = 'bill-manage-row';
+      manageRow.innerHTML = `
+        <button type="button" class="bill-edit-btn">✏️ 編輯</button>
+        <button type="button" class="bill-toggle-active-btn">${tpl.active ? '⏸️ 停用' : '▶️ 啟用'}</button>
+        <button type="button" class="bill-delete-btn danger">🗑️ 刪除</button>
+      `;
+      const editForm = document.createElement('div');
+      editForm.className = 'bill-edit-form';
+      manageRow.querySelector('.bill-edit-btn').addEventListener('click', () => {
+        const isOpen = editForm.classList.toggle('open');
+        if (isOpen) buildBillEditForm(tpl, editForm);
+      });
+      manageRow.querySelector('.bill-toggle-active-btn').addEventListener('click', () => toggleBillTemplateActive(tpl.id));
+      manageRow.querySelector('.bill-delete-btn').addEventListener('click', () => deleteBillTemplate(tpl.id));
+      card.appendChild(manageRow);
+      card.appendChild(editForm);
 
       const historyBtn = document.createElement('button');
       historyBtn.type = 'button';
@@ -4542,6 +4724,10 @@
         const pastInstances = billInstances
           .filter(i => i.templateId === tpl.id)
           .sort((a, b) => b.period.localeCompare(a.period));
+        if (pastInstances.length === 0) {
+          historyList.innerHTML = '<div class="empty-note">尚無歷史期別</div>';
+          return;
+        }
         pastInstances.forEach(pi => {
           const item = document.createElement('div');
           item.className = 'bill-history-item';
