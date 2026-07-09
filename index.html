@@ -402,35 +402,47 @@
   .month-row-header {
     display: flex;
     align-items: center;
+    gap: 10px;
     padding: 14px 0;
     width: 100%;
     background: none;
     border: none;
     text-align: left;
   }
-  .month-row-header .m-name { flex: 1; font-size: 15px; font-weight: 600; }
-  .month-row-header .m-col { width: 30%; text-align: right; font-size: 14px; }
+  .month-row-main { flex: 1; min-width: 0; }
+  .month-row-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .month-row-sub { font-size: 12px; color: var(--sub-text); margin-top: 3px; }
+  .month-row-sub .inc { color: var(--income); }
+  .month-row-sub .exp { color: var(--expense); }
+  .month-net {
+    font-size: 17px;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+    letter-spacing: -0.3px;
+  }
+  .month-arrow {
+    color: var(--sub-text);
+    font-size: 11px;
+    transition: transform 0.2s;
+  }
+  .month-row-header.expanded .month-arrow { transform: rotate(180deg); }
   .month-detail {
     display: none;
-    padding: 4px 0 14px;
+    padding: 0 0 14px;
   }
   .month-detail.open { display: block; }
   .detail-title { font-size: 12px; color: var(--sub-text); margin: 8px 0 4px; }
   .detail-item {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
     font-size: 13px;
-    padding: 4px 0;
+    padding: 5px 0;
   }
-  .pl-header {
-    display: flex;
-    font-size: 12px;
-    color: var(--sub-text);
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-  .pl-header .m-name { flex: 1; }
-  .pl-header .m-col { width: 30%; text-align: right; }
+  .detail-item .d-cat { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail-item .d-pct { font-size: 11px; color: var(--sub-text); width: 36px; text-align: right; flex-shrink: 0; }
+  .detail-item .d-amt { min-width: 78px; text-align: right; flex-shrink: 0; }
 
   /* ---- Investment ---- */
   .inv-summary-grid {
@@ -1491,12 +1503,6 @@
   <div class="page" id="page-report">
     <div class="card report-section">
       <h2>每月損益表</h2>
-      <div class="pl-header">
-        <div class="m-name">月份</div>
-        <div class="m-col">收入</div>
-        <div class="m-col">支出</div>
-        <div class="m-col">損益</div>
-      </div>
       <div id="reportList"></div>
     </div>
   </div>
@@ -3734,12 +3740,14 @@
 
       const header = document.createElement('button');
       header.type = 'button';
-      header.className = 'month-row-header';
+      header.className = 'month-row-header' + (expandedMonths.has(ym) ? ' expanded' : '');
       header.innerHTML = `
-        <div class="m-name">${y}年${parseInt(m, 10)}月</div>
-        <div class="m-col" style="color:var(--income)">${formatMoney(income)}</div>
-        <div class="m-col" style="color:var(--expense)">${formatMoney(expense)}</div>
-        <div class="m-col" style="color:${net >= 0 ? 'var(--income)' : 'var(--expense)'};font-weight:700">${formatMoney(net)}</div>
+        <div class="month-row-main">
+          <div class="month-row-title">${y}年${parseInt(m, 10)}月</div>
+          <div class="month-row-sub">收入 <span class="inc">${formatMoney(income)}</span> · 支出 <span class="exp">${formatMoney(expense)}</span></div>
+        </div>
+        <div class="month-net" style="color:${net >= 0 ? 'var(--income)' : 'var(--expense)'}">${net >= 0 ? '+' : '−'}${formatMoney(Math.abs(net))}</div>
+        <div class="month-arrow">▾</div>
       `;
 
       const detail = document.createElement('div');
@@ -3752,27 +3760,30 @@
         bucket[r.category] = (bucket[r.category] || 0) + r.amount;
       });
 
-      function detailBlock(title, totals, colorVar) {
+      function detailBlock(title, totals, colorVar, blockTotal) {
         const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
         if (entries.length === 0) return '';
         let html = `<div class="detail-title">${title}</div>`;
         entries.forEach(([cat, val]) => {
-          html += `<div class="detail-item"><span>${escapeHtml(cat)}</span><span style="color:${colorVar}">${formatMoney(val)}</span></div>`;
+          const pct = blockTotal > 0 ? Math.round(val / blockTotal * 100) : 0;
+          html += `<div class="detail-item"><span class="d-cat">${escapeHtml(cat)}</span><span class="d-pct">${pct}%</span><span class="d-amt" style="color:${colorVar}">${formatMoney(val)}</span></div>`;
         });
         return html;
       }
 
       detail.innerHTML =
-        detailBlock('支出明細', expenseTotals, 'var(--expense)') +
-        detailBlock('收入明細', incomeTotals, 'var(--income)');
+        detailBlock('支出明細', expenseTotals, 'var(--expense)', expense) +
+        detailBlock('收入明細', incomeTotals, 'var(--income)', income);
 
       header.addEventListener('click', () => {
         if (expandedMonths.has(ym)) {
           expandedMonths.delete(ym);
           detail.classList.remove('open');
+          header.classList.remove('expanded');
         } else {
           expandedMonths.add(ym);
           detail.classList.add('open');
+          header.classList.add('expanded');
         }
       });
 
@@ -4138,6 +4149,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-09', version: 'v2.10', title: '損益表排版重新調整', desc: '每月列改為行動優先的兩層排版:左側月份與收支小字、右側大字損益(+/− 帶正負號變色)，並加上展開箭頭提示可點開明細；移除擁擠的四欄表頭。明細每個類別新增佔比百分比(支出類別佔當月支出、收入類別佔當月收入)，金額過長不再擠壓換行。' },
     { date: '2026-07-08', version: 'v2.9', title: '每月預算與首頁進度視覺化', desc: '設定頁新增「每月預算」:固定支出以項目清單(車貸/保費/電信/房租)自動加總，變動支出預算附近兩月參考均值，並可勾選哪些類別算固定。首頁新增預算進度圈:固定/變動兩段堆疊填滿，中央顯示剩餘總額，變動使用率 70%/90% 變色警示，下方顯示每日可花金額；另新增每日累計花費線圖(實際 vs 等速參考線)。備份格式 v4，舊備份匯入自動沿用預設預算。' },
     { date: '2026-07-08', version: 'v2.8', title: '應繳帳單:新增刪除/停用/編輯', desc: '每個帳單類型卡片新增編輯、停用/啟用、刪除功能。刪除會移除該類型的期別與繳費追蹤紀錄，但已產生的支出記錄一律保留；停用可逆，會保留歷史但不再產生新期別，之後可重新啟用。編輯可調整名稱/金額/截止日/備註/是否連動支出等基本欄位；若該類型已有期別產生，金額類型(固定/每期填寫)將鎖定不可更改。' },
     { date: '2026-07-05', version: 'v2.7', title: '修正:分帳「你的花費=0」被誤擋', desc: '手動記帳與 CSV 匯入分帳時，「你的花費」設為 0(全額代墊)原本會被驗證誤判為無效而整筆略過不匯入；已修正為只在非分帳情境才要求金額大於 0，兩條路徑行為一致。' },
