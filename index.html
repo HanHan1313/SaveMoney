@@ -1068,6 +1068,115 @@
     margin-bottom: 14px;
   }
 
+  /* ===== Budget progress (v2.9) ===== */
+  .budget-ring-wrap {
+    position: relative;
+    width: 170px;
+    margin: 4px auto 0;
+  }
+  .budget-ring-wrap svg { display: block; width: 100%; height: auto; }
+  .budget-ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+  }
+  .budget-remaining-label { font-size: 12px; color: var(--sub-text); margin-bottom: 2px; }
+  .budget-remaining { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .budget-remaining.over { color: var(--expense); }
+  .budget-sub {
+    text-align: center;
+    font-size: 12px;
+    color: var(--sub-text);
+    margin-top: 12px;
+    line-height: 1.7;
+  }
+  .budget-warning {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--expense);
+    margin-top: 8px;
+  }
+  .budget-daily {
+    text-align: center;
+    font-size: 13px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .budget-daily .over { color: var(--expense); font-weight: 600; }
+  .budget-item-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .budget-item-row input {
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    background: var(--card-bg);
+    color: var(--text);
+    min-width: 0;
+  }
+  .budget-item-row .bi-name { flex: 1.4; }
+  .budget-item-row .bi-amount { flex: 1; }
+  .budget-item-row .bi-del {
+    border: none;
+    background: none;
+    color: var(--expense);
+    font-size: 16px;
+    padding: 4px 6px;
+  }
+  .budget-fixed-total {
+    font-size: 13px;
+    font-weight: 600;
+    text-align: right;
+    margin: 6px 0 4px;
+  }
+  .budget-ref-note { font-size: 12px; color: var(--sub-text); margin-top: 6px; }
+  .budget-cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .budget-cat-chip {
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .budget-cat-chip.on {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+  }
+  .budget-hint {
+    font-size: 12px;
+    color: var(--sub-text);
+    line-height: 1.7;
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 12px;
+  }
+  .budget-section-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 16px 0 8px;
+  }
+  .budget-section-label:first-child { margin-top: 0; }
+  .daily-chart-legend {
+    font-size: 11px;
+    color: var(--sub-text);
+    text-align: center;
+    margin-top: 6px;
+  }
+
   /* ---- Accordions (usage guide / changelog) ---- */
   .accordion-toggle {
     width: 100%;
@@ -1198,45 +1307,6 @@
 
   <!-- ============ PAGE: LEDGER ============ -->
   <div class="page active" id="page-ledger">
-    <div class="backup-banner" id="backupBanner" style="display:none;">
-      <div class="backup-banner-text" id="backupBannerText"></div>
-      <div class="backup-banner-actions">
-        <button type="button" id="backupNowBtn">立即備份</button>
-        <button type="button" id="backupLaterBtn">稍後</button>
-      </div>
-    </div>
-
-    <div class="backup-banner" id="legacyMigrationBanner" style="display:none;">
-      <div class="backup-banner-text" id="legacyMigrationText"></div>
-      <div class="backup-banner-actions">
-        <button type="button" id="legacyMigrationExportRemove">匯出備份並移除</button>
-        <button type="button" id="legacyMigrationKeep">保留不再提醒</button>
-      </div>
-    </div>
-
-    <div class="backup-banner" id="billsReminderBanner" style="display:none;">
-      <div class="backup-banner-text" id="billsReminderText"></div>
-    </div>
-
-    <!-- Monthly Summary -->
-    <div class="card">
-      <div class="month-label" id="monthLabel"></div>
-      <div class="summary-grid">
-        <div>
-          <div class="label">收入</div>
-          <div class="value income" id="totalIncome">$0</div>
-        </div>
-        <div>
-          <div class="label">支出</div>
-          <div class="value expense" id="totalExpense">$0</div>
-        </div>
-        <div>
-          <div class="label">結餘</div>
-          <div class="value balance" id="totalBalance">$0</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Input Form (Quick Entry) -->
     <div class="card">
       <div class="edit-banner" id="editBanner" style="display:none;">
@@ -1307,6 +1377,48 @@
       </div>
     </div>
 
+    <!-- Budget Progress -->
+    <div class="card" id="budgetCard"></div>
+
+    <div class="backup-banner" id="billsReminderBanner" style="display:none;">
+      <div class="backup-banner-text" id="billsReminderText"></div>
+    </div>
+
+    <div class="backup-banner" id="backupBanner" style="display:none;">
+      <div class="backup-banner-text" id="backupBannerText"></div>
+      <div class="backup-banner-actions">
+        <button type="button" id="backupNowBtn">立即備份</button>
+        <button type="button" id="backupLaterBtn">稍後</button>
+      </div>
+    </div>
+
+    <div class="backup-banner" id="legacyMigrationBanner" style="display:none;">
+      <div class="backup-banner-text" id="legacyMigrationText"></div>
+      <div class="backup-banner-actions">
+        <button type="button" id="legacyMigrationExportRemove">匯出備份並移除</button>
+        <button type="button" id="legacyMigrationKeep">保留不再提醒</button>
+      </div>
+    </div>
+
+    <!-- Monthly Summary -->
+    <div class="card">
+      <div class="month-label" id="monthLabel"></div>
+      <div class="summary-grid">
+        <div>
+          <div class="label">收入</div>
+          <div class="value income" id="totalIncome">$0</div>
+        </div>
+        <div>
+          <div class="label">支出</div>
+          <div class="value expense" id="totalExpense">$0</div>
+        </div>
+        <div>
+          <div class="label">結餘</div>
+          <div class="value balance" id="totalBalance">$0</div>
+        </div>
+      </div>
+    </div>
+
     <!-- CSV Import -->
     <div class="card import-section">
       <button type="button" class="accordion-toggle" data-target="csvImportBody">批次匯入信用卡明細 <span class="accordion-arrow">▾</span></button>
@@ -1322,6 +1434,12 @@
         <button type="button" class="submit-btn btn-outline" id="csvImportBtn">📥 選擇 CSV 檔案</button>
         <div id="csvPreview" style="margin-top:14px;"></div>
       </div>
+    </div>
+
+    <!-- Daily cumulative spending chart -->
+    <div class="card">
+      <h2>每日累計花費(變動支出)</h2>
+      <div id="dailyChartWrap"></div>
     </div>
 
     <!-- Pie Chart -->
@@ -1644,6 +1762,11 @@
     </div>
 
     <div class="card">
+      <button type="button" class="accordion-toggle" data-target="budgetSettingsBody" id="budgetSettingsToggle">💰 每月預算 <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="budgetSettingsBody"></div>
+    </div>
+
+    <div class="card">
       <button type="button" class="accordion-toggle" data-target="changelogBody">🕐 改版歷程 <span class="accordion-arrow">▾</span></button>
       <div class="accordion-body" id="changelogBody"></div>
     </div>
@@ -1707,6 +1830,7 @@
   const BILL_TEMPLATES_KEY = 'expenseTrackerBillTemplates';
   const BILL_INSTANCES_KEY = 'expenseTrackerBillInstances';
   const CATEGORY_RULES_KEY = 'expenseTrackerCategoryRules';
+  const BUDGET_KEY = 'expenseTrackerBudget';
 
   const DEFAULT_CATEGORIES = {
     expense: [
@@ -1738,6 +1862,7 @@
   let billTemplates = loadJSON(BILL_TEMPLATES_KEY, []);
   let billInstances = loadJSON(BILL_INSTANCES_KEY, []);
   let categoryRules = loadJSON(CATEGORY_RULES_KEY, { expense: {}, income: {} });
+  let budget = loadJSON(BUDGET_KEY, null);
   let currentType = 'expense';
   let currentCategory = null;
   let splitDirection = 'receivable';
@@ -1770,6 +1895,27 @@
   function saveBillTemplates() { save(BILL_TEMPLATES_KEY, billTemplates); }
   function saveBillInstances() { save(BILL_INSTANCES_KEY, billInstances); }
   function saveCategoryRules() { save(CATEGORY_RULES_KEY, categoryRules); }
+  function saveBudget() { budget.updatedAt = todayStr(); save(BUDGET_KEY, budget); }
+
+  function defaultBudget() {
+    return {
+      variableBudget: 30000,
+      fixedItems: [
+        { name: '車貸', amount: 10000 },
+        { name: '保費', amount: 5262 },
+        { name: '電信費', amount: 922 },
+        { name: '房租', amount: 5000 }
+      ],
+      fixedCategories: ['其他', '訂閱'],
+      updatedAt: todayStr()
+    };
+  }
+  if (!budget || typeof budget !== 'object' || Array.isArray(budget)) {
+    budget = defaultBudget();
+    save(BUDGET_KEY, budget);
+  }
+  if (!Array.isArray(budget.fixedItems)) budget.fixedItems = [];
+  if (!Array.isArray(budget.fixedCategories)) budget.fixedCategories = [];
 
   // ================= CATEGORY LEARNING (merchant keyword -> category) =================
   // Extracts a merchant keyword from a transaction description:
@@ -2991,6 +3137,8 @@
   function renderLedger() {
     renderSummary();
     renderChart();
+    renderBudgetCard();
+    renderDailyChart();
     populateMonthFilter();
     renderHistory();
     renderSplitsOverview();
@@ -3990,6 +4138,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-08', version: 'v2.9', title: '每月預算與首頁進度視覺化', desc: '設定頁新增「每月預算」:固定支出以項目清單(車貸/保費/電信/房租)自動加總，變動支出預算附近兩月參考均值，並可勾選哪些類別算固定。首頁新增預算進度圈:固定/變動兩段堆疊填滿，中央顯示剩餘總額，變動使用率 70%/90% 變色警示，下方顯示每日可花金額；另新增每日累計花費線圖(實際 vs 等速參考線)。備份格式 v4，舊備份匯入自動沿用預設預算。' },
     { date: '2026-07-08', version: 'v2.8', title: '應繳帳單:新增刪除/停用/編輯', desc: '每個帳單類型卡片新增編輯、停用/啟用、刪除功能。刪除會移除該類型的期別與繳費追蹤紀錄，但已產生的支出記錄一律保留；停用可逆，會保留歷史但不再產生新期別，之後可重新啟用。編輯可調整名稱/金額/截止日/備註/是否連動支出等基本欄位；若該類型已有期別產生，金額類型(固定/每期填寫)將鎖定不可更改。' },
     { date: '2026-07-05', version: 'v2.7', title: '修正:分帳「你的花費=0」被誤擋', desc: '手動記帳與 CSV 匯入分帳時，「你的花費」設為 0(全額代墊)原本會被驗證誤判為無效而整筆略過不匯入；已修正為只在非分帳情境才要求金額大於 0，兩條路徑行為一致。' },
     { date: '2026-07-05', version: 'v2.6', title: '分類規則學習', desc: '記帳、編輯記錄、CSV 匯入(逐列/批次/第4欄類別)設定類別時自動學習「商家關鍵字→類別」規則；後續記帳與匯入自動預選(仍可修改)；設定頁可檢視/刪除規則，備份格式 v3。' },
@@ -4068,7 +4217,7 @@
     `;
   }
 
-  const BACKUP_VERSION = 3;
+  const BACKUP_VERSION = 4;
 
   function buildBackup() {
     return {
@@ -4083,7 +4232,8 @@
       manualDebts,
       billTemplates,
       billInstances,
-      categoryRules
+      categoryRules,
+      budget: Object.assign({}, budget, { fixedBudget: budgetFixedTotal() })
     };
   }
 
@@ -4282,6 +4432,22 @@
       });
     }
 
+    // Budget is a single settings object rather than a list: newer updatedAt
+    // wins; backups without a budget field (v3 and earlier) leave local as-is.
+    if (data.budget && typeof data.budget === 'object' && !Array.isArray(data.budget)) {
+      const localAt = budget.updatedAt || '';
+      const importedAt = data.budget.updatedAt || '';
+      if (importedAt > localAt) {
+        budget = {
+          variableBudget: Number(data.budget.variableBudget) || 0,
+          fixedItems: Array.isArray(data.budget.fixedItems) ? data.budget.fixedItems : budget.fixedItems,
+          fixedCategories: Array.isArray(data.budget.fixedCategories) ? data.budget.fixedCategories : budget.fixedCategories,
+          updatedAt: importedAt
+        };
+        save(BUDGET_KEY, budget);
+      }
+    }
+
     saveRecords();
     saveCustomCategories();
     saveInvestments();
@@ -4328,6 +4494,7 @@
     billTemplates = [];
     billInstances = [];
     categoryRules = { expense: {}, income: {} };
+    budget = defaultBudget();
     saveRecords();
     saveCustomCategories();
     saveInvestments();
@@ -4337,6 +4504,7 @@
     saveBillTemplates();
     saveBillInstances();
     saveCategoryRules();
+    save(BUDGET_KEY, budget);
 
     renderCategoryGrid();
     renderLedger();
@@ -4841,6 +5009,278 @@
     });
 
     formWrap.style.display = 'block';
+  });
+
+  // ================= BUDGET (v2.9) =================
+  const BUDGET_FIXED_COLOR = '#9aa7b8'; // neutral blue-gray: fixed segment never carries a warning color
+  const BUDGET_SAFE_COLOR = '#34c759';
+  const BUDGET_WARN_COLOR = '#ff9500';
+  const BUDGET_DANGER_COLOR = '#ff3b30';
+
+  function budgetFixedTotal() {
+    return budget.fixedItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  }
+
+  function computeBudgetProgress() {
+    const ym = todayStr().slice(0, 7);
+    const fixedSet = new Set(budget.fixedCategories);
+    let fixedSpent = 0;
+    let variableSpent = 0;
+    records.forEach(r => {
+      if (r.type !== 'expense' || r.date.slice(0, 7) !== ym) return;
+      if (fixedSet.has(r.category)) fixedSpent += r.amount;
+      else variableSpent += r.amount;
+    });
+    fixedSpent = Math.round(fixedSpent * 100) / 100;
+    variableSpent = Math.round(variableSpent * 100) / 100;
+    const fixedBudget = budgetFixedTotal();
+    const variableBudget = Number(budget.variableBudget) || 0;
+    return {
+      fixedSpent, variableSpent, fixedBudget, variableBudget,
+      totalBudget: fixedBudget + variableBudget,
+      totalSpent: fixedSpent + variableSpent
+    };
+  }
+
+  function monthDayInfo() {
+    const now = new Date();
+    const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    return { totalDays, dayOfMonth, remainingDays: totalDays - dayOfMonth + 1 };
+  }
+
+  function renderBudgetCard() {
+    const card = el('budgetCard');
+    if (!card) return;
+    const p = computeBudgetProgress();
+
+    if (p.totalBudget <= 0) {
+      card.innerHTML = `
+        <div class="month-label">本月預算進度</div>
+        <div class="empty-note">尚未設定每月預算</div>
+        <button type="button" class="submit-btn btn-outline" id="budgetSetupBtn">⚙️ 設定每月預算</button>
+      `;
+      el('budgetSetupBtn').addEventListener('click', () => {
+        document.querySelector('.nav-btn[data-page="settings"]').click();
+        const body = el('budgetSettingsBody');
+        if (body && !body.classList.contains('open')) el('budgetSettingsToggle').click();
+      });
+      return;
+    }
+
+    const { remainingDays } = monthDayInfo();
+    const variableRatio = p.variableBudget > 0 ? p.variableSpent / p.variableBudget : (p.variableSpent > 0 ? 1 : 0);
+    const varColor = variableRatio < 0.7 ? BUDGET_SAFE_COLOR : (variableRatio < 0.9 ? BUDGET_WARN_COLOR : BUDGET_DANGER_COLOR);
+    const totalRemaining = Math.round((p.totalBudget - p.totalSpent) * 100) / 100;
+    const usedPct = Math.round((p.totalSpent / p.totalBudget) * 100);
+    const over = totalRemaining < 0;
+
+    const R = 62;
+    const C = 2 * Math.PI * R;
+    const fixedFrac = Math.min(p.fixedSpent / p.totalBudget, 1);
+    const varFrac = Math.min(p.variableSpent / p.totalBudget, Math.max(0, 1 - fixedFrac));
+    const ring = `
+      <svg viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--border)" stroke-width="13"/>
+        ${fixedFrac > 0.0005 ? `<circle cx="75" cy="75" r="${R}" fill="none" stroke="${BUDGET_FIXED_COLOR}" stroke-width="13" stroke-dasharray="${(fixedFrac * C).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 75 75)"/>` : ''}
+        ${varFrac > 0.0005 ? `<circle cx="75" cy="75" r="${R}" fill="none" stroke="${varColor}" stroke-width="13" stroke-dasharray="${(varFrac * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-fixedFrac * C).toFixed(2)}" transform="rotate(-90 75 75)"/>` : ''}
+      </svg>`;
+
+    const variableRemaining = Math.round((p.variableBudget - p.variableSpent) * 100) / 100;
+    const dailyLine = variableRemaining >= 0
+      ? `本月還剩 ${remainingDays} 天 · 變動支出平均每天可花 ${formatMoney(Math.floor(variableRemaining / remainingDays))}`
+      : `<span class="over">已超出變動預算 ${formatMoney(Math.abs(variableRemaining))}</span>`;
+
+    card.innerHTML = `
+      <div class="month-label">本月預算進度</div>
+      <div class="budget-ring-wrap">
+        ${ring}
+        <div class="budget-ring-center">
+          <div class="budget-remaining-label">${over ? '已超支' : '還剩'}</div>
+          <div class="budget-remaining ${over ? 'over' : ''}">${formatMoney(Math.abs(totalRemaining))}</div>
+        </div>
+      </div>
+      <div class="budget-sub">
+        總預算 ${formatMoney(p.totalBudget)} · 已用 ${usedPct}%<br>
+        固定 ${formatMoney(p.fixedSpent)} / 變動 ${formatMoney(p.variableSpent)}
+      </div>
+      ${variableRatio >= 0.9 ? `<div class="budget-warning">變動支出已達 ${Math.round(variableRatio * 100)}%，本月還剩 ${remainingDays} 天</div>` : ''}
+      <div class="budget-daily">${dailyLine}</div>
+    `;
+  }
+
+  function renderDailyChart() {
+    const wrap = el('dailyChartWrap');
+    if (!wrap) return;
+    const { totalDays, dayOfMonth } = monthDayInfo();
+    const ym = todayStr().slice(0, 7);
+    const variableBudget = Number(budget.variableBudget) || 0;
+    const fixedSet = new Set(budget.fixedCategories);
+
+    if (dayOfMonth <= 3) {
+      wrap.innerHTML = '<div class="empty-note">資料累積中，月初過幾天再回來看 📈</div>';
+      return;
+    }
+
+    const daily = new Array(totalDays + 1).fill(0);
+    records.forEach(r => {
+      if (r.type !== 'expense' || r.date.slice(0, 7) !== ym) return;
+      if (fixedSet.has(r.category)) return;
+      const d = parseInt(r.date.slice(8, 10), 10);
+      if (d >= 1 && d <= totalDays) daily[d] += r.amount;
+    });
+
+    const cum = [];
+    let acc = 0;
+    for (let d = 1; d <= dayOfMonth; d++) { acc += daily[d]; cum.push(Math.round(acc * 100) / 100); }
+    acc = Math.round(acc * 100) / 100;
+
+    const W = 320, H = 190, padL = 10, padR = 14, padT = 16, padB = 22;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const maxY = Math.max(variableBudget, acc, 1) * 1.08;
+    const x = d => padL + (d / totalDays) * plotW;
+    const y = v => padT + plotH - (v / maxY) * plotH;
+
+    const actualPts = [`${x(0).toFixed(1)},${y(0).toFixed(1)}`]
+      .concat(cum.map((v, i) => `${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`))
+      .join(' ');
+    const areaPts = `${actualPts} ${x(dayOfMonth).toFixed(1)},${y(0).toFixed(1)} ${x(0).toFixed(1)},${y(0).toFixed(1)}`;
+
+    const idealToday = variableBudget * dayOfMonth / totalDays;
+    const healthy = acc <= idealToday;
+    const areaColor = healthy ? 'rgba(52,199,89,0.12)' : 'rgba(255,59,48,0.12)';
+
+    wrap.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <line x1="${x(0)}" y1="${y(0)}" x2="${x(totalDays)}" y2="${y(0)}" stroke="var(--border)" stroke-width="1"/>
+        ${variableBudget > 0 ? `<line x1="${x(0).toFixed(1)}" y1="${y(0).toFixed(1)}" x2="${x(totalDays).toFixed(1)}" y2="${y(variableBudget).toFixed(1)}" stroke="#8e8e93" stroke-width="1.5" stroke-dasharray="5,4"/>` : ''}
+        <polygon points="${areaPts}" fill="${areaColor}"/>
+        <polyline points="${actualPts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+        <circle cx="${x(dayOfMonth).toFixed(1)}" cy="${y(acc).toFixed(1)}" r="4" fill="var(--accent)"/>
+        ${variableBudget > 0 ? `<text x="${(x(totalDays) - 4).toFixed(1)}" y="${(y(variableBudget) - 6).toFixed(1)}" text-anchor="end" font-size="10" fill="#8e8e93">預算 ${formatMoney(variableBudget)}</text>` : ''}
+        <text x="${x(1).toFixed(1)}" y="${H - 6}" font-size="10" fill="#8e8e93">1日</text>
+        <text x="${x(totalDays).toFixed(1)}" y="${H - 6}" text-anchor="end" font-size="10" fill="#8e8e93">${totalDays}日</text>
+        <text x="${x(dayOfMonth).toFixed(1)}" y="${(y(acc) - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="bold">${formatMoney(acc)}</text>
+      </svg>
+      <div class="daily-chart-legend">實線＝實際累計變動支出 · 虛線＝等速消費參考線${healthy ? '（進度健康 ✅）' : '（花得比等速快 ⚠️）'}</div>
+    `;
+  }
+
+  function pastVariableReference() {
+    const fixedSet = new Set(budget.fixedCategories);
+    const now = new Date();
+    const totals = [];
+    for (let i = 1; i <= 2; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const t = records
+        .filter(r => r.type === 'expense' && r.date.slice(0, 7) === m && !fixedSet.has(r.category))
+        .reduce((s, r) => s + r.amount, 0);
+      if (t > 0) totals.push(Math.round(t));
+    }
+    if (totals.length === 0) return '';
+    const lo = Math.min(...totals), hi = Math.max(...totals);
+    const range = lo === hi ? formatMoney(lo) : `${formatMoney(lo)}–${formatMoney(hi)}`;
+    return `參考:近兩個月變動支出約 ${range}`;
+  }
+
+  function renderBudgetSettings() {
+    const body = el('budgetSettingsBody');
+    if (!body) return;
+
+    const itemsHtml = budget.fixedItems.map((it, idx) => `
+      <div class="budget-item-row" data-idx="${idx}">
+        <input type="text" class="bi-name" value="${escapeHtml(it.name)}" placeholder="項目名稱">
+        <input type="number" class="bi-amount" inputmode="decimal" min="0" step="1" value="${Number(it.amount) || 0}">
+        <button type="button" class="bi-del">✕</button>
+      </div>
+    `).join('');
+
+    const catChips = getCategories('expense').map(c => {
+      const on = budget.fixedCategories.includes(c.key);
+      return `<button type="button" class="budget-cat-chip ${on ? 'on' : ''}" data-cat="${escapeHtml(c.key)}">${c.icon} ${escapeHtml(c.key)}</button>`;
+    }).join('');
+
+    const refNote = pastVariableReference();
+
+    body.innerHTML = `
+      <div class="budget-section-label">固定支出項目(每月跑不掉的)</div>
+      <div id="budgetFixedItems">${itemsHtml}</div>
+      <button type="button" class="submit-btn btn-outline" id="budgetAddItemBtn" style="margin-top:4px;">+ 新增固定項目</button>
+      <div class="budget-fixed-total">固定預算合計:<span id="budgetFixedSum">${formatMoney(budgetFixedTotal())}</span></div>
+
+      <div class="budget-section-label">變動支出預算(可自己控制的)</div>
+      <div class="field" style="margin-bottom:0;">
+        <input type="number" id="budgetVariableInput" inputmode="decimal" min="0" step="100" value="${Number(budget.variableBudget) || 0}">
+        ${refNote ? `<div class="budget-ref-note">${refNote}</div>` : ''}
+      </div>
+
+      <div class="budget-section-label">哪些類別算固定支出</div>
+      <div class="budget-cat-list" id="budgetCatList">${catChips}</div>
+
+      <div class="budget-hint">固定支出是每月跑不掉的(房租、車貸、保費、電信);變動支出是可自己控制的(餐飲、購物、娛樂)。房屋稅等年度稅費不算每月固定。進度圈主要盯變動支出。房租若沒有對應記錄，建議記帳時歸入專設的固定類別，或在帳單頁設為固定金額帳單自動產生。</div>
+    `;
+
+    function refreshAfterChange() {
+      saveBudget();
+      el('budgetFixedSum').textContent = formatMoney(budgetFixedTotal());
+      renderBudgetCard();
+      renderDailyChart();
+    }
+
+    body.querySelectorAll('.budget-item-row').forEach(row => {
+      const idx = parseInt(row.dataset.idx, 10);
+      row.querySelector('.bi-name').addEventListener('change', (e) => {
+        budget.fixedItems[idx].name = e.target.value.trim();
+        refreshAfterChange();
+      });
+      row.querySelector('.bi-amount').addEventListener('input', (e) => {
+        budget.fixedItems[idx].amount = parseFloat(e.target.value) || 0;
+        refreshAfterChange();
+      });
+      row.querySelector('.bi-del').addEventListener('click', () => {
+        const it = budget.fixedItems[idx];
+        if (!confirm(`要移除固定項目「${it.name || '(未命名)'}」嗎？`)) return;
+        budget.fixedItems.splice(idx, 1);
+        saveBudget();
+        renderBudgetSettings();
+        renderBudgetCard();
+        renderDailyChart();
+      });
+    });
+
+    el('budgetAddItemBtn').addEventListener('click', () => {
+      budget.fixedItems.push({ name: '', amount: 0 });
+      saveBudget();
+      renderBudgetSettings();
+      const rows = el('budgetFixedItems').querySelectorAll('.bi-name');
+      if (rows.length) rows[rows.length - 1].focus();
+    });
+
+    el('budgetVariableInput').addEventListener('input', (e) => {
+      budget.variableBudget = parseFloat(e.target.value) || 0;
+      refreshAfterChange();
+    });
+
+    body.querySelectorAll('.budget-cat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const key = chip.dataset.cat;
+        const i = budget.fixedCategories.indexOf(key);
+        if (i >= 0) budget.fixedCategories.splice(i, 1);
+        else budget.fixedCategories.push(key);
+        chip.classList.toggle('on');
+        refreshAfterChange();
+      });
+    });
+  }
+
+  // Rebuild the budget settings body each time the accordion is opened, so
+  // newly added custom categories always appear in the fixed-category list.
+  // This direct listener fires before the document-level accordion toggler,
+  // so "about to open" means the body does NOT yet have the .open class.
+  el('budgetSettingsToggle').addEventListener('click', () => {
+    const body = el('budgetSettingsBody');
+    if (body && !body.classList.contains('open')) renderBudgetSettings();
   });
 
   // ---------- Init ----------
