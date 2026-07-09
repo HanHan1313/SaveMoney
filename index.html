@@ -1412,25 +1412,6 @@
       </div>
     </div>
 
-    <!-- Monthly Summary -->
-    <div class="card">
-      <div class="month-label" id="monthLabel"></div>
-      <div class="summary-grid">
-        <div>
-          <div class="label">收入</div>
-          <div class="value income" id="totalIncome">$0</div>
-        </div>
-        <div>
-          <div class="label">支出</div>
-          <div class="value expense" id="totalExpense">$0</div>
-        </div>
-        <div>
-          <div class="label">結餘</div>
-          <div class="value balance" id="totalBalance">$0</div>
-        </div>
-      </div>
-    </div>
-
     <!-- CSV Import -->
     <div class="card import-section">
       <button type="button" class="accordion-toggle" data-target="csvImportBody">批次匯入信用卡明細 <span class="accordion-arrow">▾</span></button>
@@ -1847,6 +1828,7 @@
       { key: '醫療', icon: '💊' },
       { key: '教育', icon: '📚' },
       { key: '居家', icon: '🏠' },
+      { key: '訂閱', icon: '🔁' },
       { key: '其他', icon: '📦' }
     ],
     income: [
@@ -1912,7 +1894,7 @@
         { name: '電信費', amount: 922 },
         { name: '房租', amount: 5000 }
       ],
-      fixedCategories: ['其他', '訂閱'],
+      fixedCategories: ['訂閱'],
       updatedAt: todayStr()
     };
   }
@@ -2016,7 +1998,11 @@
   }
 
   function getCategories(type) {
-    return DEFAULT_CATEGORIES[type].concat(customCategories[type] || []);
+    // Drop custom entries that clash with a default key (e.g. a user-created
+    // 訂閱 category from before it became a built-in default).
+    const defaults = DEFAULT_CATEGORIES[type];
+    const defaultKeys = new Set(defaults.map(c => c.key));
+    return defaults.concat((customCategories[type] || []).filter(c => !defaultKeys.has(c.key)));
   }
 
   // Migrate legacy single-counterpart "receivable" splits to the participants array format
@@ -2539,21 +2525,6 @@
 
     renderCategoryGrid();
     renderLedger();
-  }
-
-  // ---------- Summary (current month) ----------
-  function renderSummary() {
-    const now = new Date();
-    const ym = now.toISOString().slice(0, 7);
-    el('monthLabel').textContent = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
-
-    const monthRecords = records.filter(r => r.date.slice(0, 7) === ym);
-    const income = monthRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const expense = monthRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-
-    el('totalIncome').textContent = formatMoney(income);
-    el('totalExpense').textContent = formatMoney(expense);
-    el('totalBalance').textContent = formatMoney(income - expense);
   }
 
   // ---------- Pie Chart (current month, expenses) ----------
@@ -3141,7 +3112,6 @@
   }
 
   function renderLedger() {
-    renderSummary();
     renderChart();
     renderBudgetCard();
     renderDailyChart();
@@ -4149,6 +4119,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-09', version: 'v2.11', title: '首頁精簡、訂閱類別與帳單自動歸固定', desc: '移除首頁月摘要卡(收入/支出/結餘改到損益表頁查看)，首屏聚焦快速記帳與預算進度圈；新增內建支出類別「訂閱」(🔁)，預設計入固定支出。「應繳帳單」繳費產生的支出記錄現在自動計入預算的固定段(不看類別、過去已繳的也回溯適用)，固定類別勾選只留給不走帳單模組的固定支出。' },
     { date: '2026-07-09', version: 'v2.10', title: '損益表排版重新調整', desc: '每月列改為行動優先的兩層排版:左側月份與收支小字、右側大字損益(+/− 帶正負號變色)，並加上展開箭頭提示可點開明細；移除擁擠的四欄表頭。明細每個類別新增佔比百分比(支出類別佔當月支出、收入類別佔當月收入)，金額過長不再擠壓換行。' },
     { date: '2026-07-08', version: 'v2.9', title: '每月預算與首頁進度視覺化', desc: '設定頁新增「每月預算」:固定支出以項目清單(車貸/保費/電信/房租)自動加總，變動支出預算附近兩月參考均值，並可勾選哪些類別算固定。首頁新增預算進度圈:固定/變動兩段堆疊填滿，中央顯示剩餘總額，變動使用率 70%/90% 變色警示，下方顯示每日可花金額；另新增每日累計花費線圖(實際 vs 等速參考線)。備份格式 v4，舊備份匯入自動沿用預設預算。' },
     { date: '2026-07-08', version: 'v2.8', title: '應繳帳單:新增刪除/停用/編輯', desc: '每個帳單類型卡片新增編輯、停用/啟用、刪除功能。刪除會移除該類型的期別與繳費追蹤紀錄，但已產生的支出記錄一律保留；停用可逆，會保留歷史但不再產生新期別，之後可重新啟用。編輯可調整名稱/金額/截止日/備註/是否連動支出等基本欄位；若該類型已有期別產生，金額類型(固定/每期填寫)將鎖定不可更改。' },
@@ -5033,14 +5004,26 @@
     return budget.fixedItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
   }
 
+  // Expense records created by paying a bill (應繳帳單) always count as fixed
+  // spending, regardless of their category. The linkage lives on the bill
+  // payments (payment.recordId), so this also applies to past payments.
+  function billLinkedRecordIds() {
+    const ids = new Set();
+    billInstances.forEach(inst => (inst.payments || []).forEach(p => {
+      if (p.recordId) ids.add(p.recordId);
+    }));
+    return ids;
+  }
+
   function computeBudgetProgress() {
     const ym = todayStr().slice(0, 7);
     const fixedSet = new Set(budget.fixedCategories);
+    const billIds = billLinkedRecordIds();
     let fixedSpent = 0;
     let variableSpent = 0;
     records.forEach(r => {
       if (r.type !== 'expense' || r.date.slice(0, 7) !== ym) return;
-      if (fixedSet.has(r.category)) fixedSpent += r.amount;
+      if (fixedSet.has(r.category) || billIds.has(r.id)) fixedSpent += r.amount;
       else variableSpent += r.amount;
     });
     fixedSpent = Math.round(fixedSpent * 100) / 100;
@@ -5134,10 +5117,11 @@
       return;
     }
 
+    const billIds = billLinkedRecordIds();
     const daily = new Array(totalDays + 1).fill(0);
     records.forEach(r => {
       if (r.type !== 'expense' || r.date.slice(0, 7) !== ym) return;
-      if (fixedSet.has(r.category)) return;
+      if (fixedSet.has(r.category) || billIds.has(r.id)) return;
       const d = parseInt(r.date.slice(8, 10), 10);
       if (d >= 1 && d <= totalDays) daily[d] += r.amount;
     });
@@ -5180,13 +5164,14 @@
 
   function pastVariableReference() {
     const fixedSet = new Set(budget.fixedCategories);
+    const billIds = billLinkedRecordIds();
     const now = new Date();
     const totals = [];
     for (let i = 1; i <= 2; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const t = records
-        .filter(r => r.type === 'expense' && r.date.slice(0, 7) === m && !fixedSet.has(r.category))
+        .filter(r => r.type === 'expense' && r.date.slice(0, 7) === m && !fixedSet.has(r.category) && !billIds.has(r.id))
         .reduce((s, r) => s + r.amount, 0);
       if (t > 0) totals.push(Math.round(t));
     }
@@ -5230,7 +5215,7 @@
       <div class="budget-section-label">哪些類別算固定支出</div>
       <div class="budget-cat-list" id="budgetCatList">${catChips}</div>
 
-      <div class="budget-hint">固定支出是每月跑不掉的(房租、車貸、保費、電信);變動支出是可自己控制的(餐飲、購物、娛樂)。房屋稅等年度稅費不算每月固定。進度圈主要盯變動支出。房租若沒有對應記錄，建議記帳時歸入專設的固定類別，或在帳單頁設為固定金額帳單自動產生。</div>
+      <div class="budget-hint">「應繳帳單」繳費時同步產生的支出會<strong>自動計入固定支出</strong>，不用在這裡勾選——車貸、保費、電信、房租建議都在帳單頁建立，繳費即自動歸類。這裡的類別勾選是給不走帳單模組的固定支出用的(如訂閱)。房屋稅等年度稅費不算每月固定；進度圈主要盯變動支出。</div>
     `;
 
     function refreshAfterChange() {
