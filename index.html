@@ -1429,21 +1429,6 @@
       </div>
     </div>
 
-    <!-- Daily cumulative spending chart -->
-    <div class="card">
-      <h2>每日累計花費(變動支出)</h2>
-      <div id="dailyChartWrap"></div>
-    </div>
-
-    <!-- Pie Chart -->
-    <div class="card chart-section">
-      <h2>本月支出比例</h2>
-      <div class="chart-wrap" id="chartWrap">
-        <canvas id="pieCanvas" width="200" height="200"></canvas>
-        <div class="legend" id="legend"></div>
-      </div>
-    </div>
-
     <!-- Split overview -->
     <div class="card split-section">
       <button type="button" class="accordion-toggle" data-target="splitOverviewBody">分帳總覽 <span class="split-collapsed-badge" id="splitCollapsedBadge"></span> <span class="accordion-arrow">▾</span></button>
@@ -1485,6 +1470,21 @@
     <div class="card report-section">
       <h2>每月損益表</h2>
       <div id="reportList"></div>
+    </div>
+
+    <!-- Pie Chart (current month) -->
+    <div class="card chart-section">
+      <h2>本月支出比例</h2>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="pieCanvas" width="200" height="200"></canvas>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+
+    <!-- Daily cumulative spending chart (current month) -->
+    <div class="card">
+      <h2>每日累計花費(變動支出)</h2>
+      <div id="dailyChartWrap"></div>
     </div>
   </div>
 
@@ -3112,9 +3112,7 @@
   }
 
   function renderLedger() {
-    renderChart();
     renderBudgetCard();
-    renderDailyChart();
     populateMonthFilter();
     renderHistory();
     renderSplitsOverview();
@@ -3688,6 +3686,8 @@
 
   // ================= REPORT (Monthly P&L) =================
   function renderReport() {
+    renderChart();
+    renderDailyChart();
     const list = el('reportList');
     list.innerHTML = '';
 
@@ -4119,6 +4119,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-10', version: 'v2.12', title: '圖表移至損益表頁', desc: '「本月支出比例」圓餅與「每日累計花費」線圖從記帳頁移到損益表頁，記帳頁回歸輸入本位:快速記帳+預算進度圈+歷史紀錄;損益表頁成為完整的分析頁:每月損益表在最上方，當月圖表接續在下。' },
     { date: '2026-07-09', version: 'v2.11', title: '首頁精簡、訂閱類別與帳單自動歸固定', desc: '移除首頁月摘要卡(收入/支出/結餘改到損益表頁查看)，首屏聚焦快速記帳與預算進度圈；新增內建支出類別「訂閱」(🔁)，預設計入固定支出。「應繳帳單」繳費產生的支出記錄現在自動計入預算的固定段(不看類別、過去已繳的也回溯適用)，固定類別勾選只留給不走帳單模組的固定支出。' },
     { date: '2026-07-09', version: 'v2.10', title: '損益表排版重新調整', desc: '每月列改為行動優先的兩層排版:左側月份與收支小字、右側大字損益(+/− 帶正負號變色)，並加上展開箭頭提示可點開明細；移除擁擠的四欄表頭。明細每個類別新增佔比百分比(支出類別佔當月支出、收入類別佔當月收入)，金額過長不再擠壓換行。' },
     { date: '2026-07-08', version: 'v2.9', title: '每月預算與首頁進度視覺化', desc: '設定頁新增「每月預算」:固定支出以項目清單(車貸/保費/電信/房租)自動加總，變動支出預算附近兩月參考均值，並可勾選哪些類別算固定。首頁新增預算進度圈:固定/變動兩段堆疊填滿，中央顯示剩餘總額，變動使用率 70%/90% 變色警示，下方顯示每日可花金額；另新增每日累計花費線圖(實際 vs 等速參考線)。備份格式 v4，舊備份匯入自動沿用預設預算。' },
