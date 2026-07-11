@@ -1,4 +1,4 @@
-const CACHE_NAME = 'savemoney-shell-v2';
+const CACHE_NAME = 'savemoney-shell-v3';
 const ASSETS = [
   './',
   './index.html',

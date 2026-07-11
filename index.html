@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>簡約記帳</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#007aff">
+<meta name="theme-color" content="#6B5B95">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,14 +13,18 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root {
-    --bg: #f5f5f7;
+    --bg: #EDE8F5;
     --card-bg: #ffffff;
-    --text: #1c1c1e;
-    --sub-text: #8e8e93;
-    --border: #e5e5ea;
-    --income: #34c759;
-    --expense: #ff3b30;
-    --accent: #007aff;
+    --text: #3D3A4A;
+    --sub-text: #6E6880;
+    --border: #DDD6EA;
+    /* AA-darkened text variants of the palette greens/reds (#5B9279 / #E07A5F
+       are only 3.6:1 / 3.0:1 on white); fills and ring segments use the
+       original palette colors via the BUDGET_* constants. */
+    --income: #4A7A63;
+    --expense: #C05138;
+    --accent: #6B5B95;
+    --accent-yellow: #F2E06B;
     --radius: 16px;
   }
 
@@ -355,8 +359,8 @@
     margin-top: 4px;
     white-space: nowrap;
   }
-  .csv-warn-badge.duplicate { background: rgba(255,149,0,0.15); color: #ff9500; }
-  .csv-warn-badge.invalid { background: rgba(255,59,48,0.12); color: var(--expense); }
+  .csv-warn-badge.duplicate { background: rgba(234,196,53,0.22); color: #6B5D1A; }
+  .csv-warn-badge.invalid { background: rgba(224,122,95,0.15); color: var(--expense); }
   .split-badge {
     display: inline-block;
     font-size: 10px;
@@ -678,9 +682,9 @@
 
   /* ---- Settings / Backup ---- */
   .btn-danger {
-    background: rgba(255,59,48,0.08);
+    background: rgba(224,122,95,0.10);
     color: var(--expense);
-    border: 1px solid rgba(255,59,48,0.3);
+    border: 1px solid rgba(224,122,95,0.35);
   }
   .settings-desc {
     font-size: 13px;
@@ -748,8 +752,8 @@
 
   /* ---- Backup reminder banner ---- */
   .backup-banner {
-    background: #fff3e0;
-    border: 1px solid #ffcc80;
+    background: #FBF5D8;
+    border: 1px solid var(--accent-yellow);
     border-radius: var(--radius);
     padding: 14px 16px;
     margin-bottom: 16px;
@@ -758,15 +762,15 @@
     gap: 10px;
   }
   .backup-banner.danger {
-    background: #ffebee;
-    border-color: #ffb3ba;
+    background: #F9E4DD;
+    border-color: #ECB4A3;
   }
   .backup-banner.danger .backup-banner-text {
     color: var(--expense);
   }
   .backup-banner-text {
     font-size: 13px;
-    color: #b25e00;
+    color: #6B5D1A;
     font-weight: 600;
     line-height: 1.5;
   }
@@ -782,8 +786,9 @@
     border-radius: 10px;
     border: none;
   }
-  #backupNowBtn { background: #ff9500; color: #fff; }
-  #backupLaterBtn { background: #fff; color: #b25e00; border: 1px solid #ffcc80; }
+  /* Dark text on yellow — never white (WCAG AA). */
+  #backupNowBtn { background: var(--accent-yellow); color: var(--text); }
+  #backupLaterBtn { background: #fff; color: var(--accent); border: 1px solid var(--accent-yellow); }
 
   /* ---- Edit banner ---- */
   .edit-banner {
@@ -974,10 +979,10 @@
     padding: 3px 10px;
     border-radius: 10px;
   }
-  .bill-status-badge.paid { background: rgba(52,199,89,0.15); color: var(--income); }
-  .bill-status-badge.unpaid { background: rgba(255,59,48,0.12); color: var(--expense); }
-  .bill-status-badge.partial { background: rgba(255,149,0,0.15); color: #ff9500; }
-  .bill-status-badge.pending_amount { background: rgba(142,142,147,0.15); color: var(--sub-text); }
+  .bill-status-badge.paid { background: rgba(91,146,121,0.15); color: var(--income); }
+  .bill-status-badge.unpaid { background: rgba(224,122,95,0.15); color: var(--expense); }
+  .bill-status-badge.partial { background: rgba(234,196,53,0.22); color: #6B5D1A; }
+  .bill-status-badge.pending_amount { background: rgba(110,104,128,0.15); color: var(--sub-text); }
   .bill-sub {
     font-size: 13px;
     color: var(--sub-text);
@@ -1061,7 +1066,7 @@
     font-weight: 700;
     padding: 3px 10px;
     border-radius: 10px;
-    background: rgba(142,142,147,0.15);
+    background: rgba(110,104,128,0.15);
     color: var(--sub-text);
   }
   .bill-edit-form {
@@ -1187,7 +1192,15 @@
     color: var(--sub-text);
     text-align: center;
     margin-top: 6px;
+    line-height: 1.6;
   }
+  .daily-chart-status {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .daily-chart-status.over { color: var(--expense); }
+  .daily-chart-status.ok { color: var(--income); }
 
   /* ---- Accordions (usage guide / changelog) ---- */
   .accordion-toggle {
@@ -1578,44 +1591,44 @@
             類別按鈕會依使用頻率自動排前面。信用卡消費不用手記,月底統一匯入。</p>
 
             <svg class="usage-diagram" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-              <rect x="20" y="10" width="260" height="60" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
-              <circle cx="40" cy="30" r="12" fill="#007aff"/>
+              <rect x="20" y="10" width="260" height="60" rx="12" fill="#ffffff" stroke="#DDD6EA" stroke-width="2"/>
+              <circle cx="40" cy="30" r="12" fill="#6B5B95"/>
               <text x="40" y="35" text-anchor="middle" font-size="13" fill="#ffffff" font-weight="bold">①</text>
-              <text x="65" y="27" font-size="12" fill="#8e8e93">金額</text>
-              <rect x="65" y="34" width="80" height="20" rx="6" fill="#f5f5f7" stroke="#e5e5ea"/>
-              <text x="75" y="49" font-size="12" fill="#1c1c1e">0</text>
+              <text x="65" y="27" font-size="12" fill="#6E6880">金額</text>
+              <rect x="65" y="34" width="80" height="20" rx="6" fill="#EDE8F5" stroke="#DDD6EA"/>
+              <text x="75" y="49" font-size="12" fill="#3D3A4A">0</text>
 
-              <line x1="150" y1="72" x2="150" y2="93" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow1)"/>
+              <line x1="150" y1="72" x2="150" y2="93" stroke="#6E6880" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow1)"/>
 
-              <rect x="20" y="96" width="260" height="60" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
-              <circle cx="40" cy="116" r="12" fill="#007aff"/>
+              <rect x="20" y="96" width="260" height="60" rx="12" fill="#ffffff" stroke="#DDD6EA" stroke-width="2"/>
+              <circle cx="40" cy="116" r="12" fill="#6B5B95"/>
               <text x="40" y="121" text-anchor="middle" font-size="13" fill="#ffffff" font-weight="bold">②</text>
-              <text x="65" y="113" font-size="12" fill="#8e8e93">日期</text>
-              <rect x="65" y="120" width="60" height="22" rx="8" fill="#007aff"/>
+              <text x="65" y="113" font-size="12" fill="#6E6880">日期</text>
+              <rect x="65" y="120" width="60" height="22" rx="8" fill="#6B5B95"/>
               <text x="95" y="135" text-anchor="middle" font-size="11" fill="#ffffff">今天</text>
-              <rect x="132" y="120" width="60" height="22" rx="8" fill="#f5f5f7" stroke="#e5e5ea"/>
-              <text x="162" y="135" text-anchor="middle" font-size="11" fill="#1c1c1e">昨天</text>
+              <rect x="132" y="120" width="60" height="22" rx="8" fill="#EDE8F5" stroke="#DDD6EA"/>
+              <text x="162" y="135" text-anchor="middle" font-size="11" fill="#3D3A4A">昨天</text>
 
-              <line x1="150" y1="158" x2="150" y2="179" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow1)"/>
+              <line x1="150" y1="158" x2="150" y2="179" stroke="#6E6880" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow1)"/>
 
-              <rect x="20" y="182" width="260" height="105" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
-              <circle cx="40" cy="202" r="12" fill="#007aff"/>
+              <rect x="20" y="182" width="260" height="105" rx="12" fill="#ffffff" stroke="#DDD6EA" stroke-width="2"/>
+              <circle cx="40" cy="202" r="12" fill="#6B5B95"/>
               <text x="40" y="207" text-anchor="middle" font-size="13" fill="#ffffff" font-weight="bold">③</text>
-              <text x="65" y="207" font-size="12" fill="#8e8e93">點類別即完成</text>
-              <rect x="35" y="218" width="55" height="30" rx="8" fill="#ff3b30"/>
+              <text x="65" y="207" font-size="12" fill="#6E6880">點類別即完成</text>
+              <rect x="35" y="218" width="55" height="30" rx="8" fill="#E07A5F"/>
               <text x="62" y="237" text-anchor="middle" font-size="10" fill="#ffffff">🍔餐飲</text>
-              <rect x="98" y="218" width="55" height="30" rx="8" fill="#f5f5f7" stroke="#e5e5ea"/>
-              <text x="125" y="237" text-anchor="middle" font-size="10" fill="#1c1c1e">🚌交通</text>
-              <rect x="161" y="218" width="55" height="30" rx="8" fill="#f5f5f7" stroke="#e5e5ea"/>
-              <text x="188" y="237" text-anchor="middle" font-size="10" fill="#1c1c1e">🎮娛樂</text>
-              <rect x="224" y="218" width="35" height="30" rx="8" fill="#f5f5f7" stroke="#e5e5ea" stroke-dasharray="3,2"/>
-              <text x="241" y="237" text-anchor="middle" font-size="10" fill="#8e8e93">⋯</text>
-              <text x="35" y="266" font-size="11" fill="#8e8e93">點下即自動記錄</text>
-              <text x="35" y="280" font-size="11" fill="#8e8e93">不用按儲存</text>
+              <rect x="98" y="218" width="55" height="30" rx="8" fill="#EDE8F5" stroke="#DDD6EA"/>
+              <text x="125" y="237" text-anchor="middle" font-size="10" fill="#3D3A4A">🚌交通</text>
+              <rect x="161" y="218" width="55" height="30" rx="8" fill="#EDE8F5" stroke="#DDD6EA"/>
+              <text x="188" y="237" text-anchor="middle" font-size="10" fill="#3D3A4A">🎮娛樂</text>
+              <rect x="224" y="218" width="35" height="30" rx="8" fill="#EDE8F5" stroke="#DDD6EA" stroke-dasharray="3,2"/>
+              <text x="241" y="237" text-anchor="middle" font-size="10" fill="#6E6880">⋯</text>
+              <text x="35" y="266" font-size="11" fill="#6E6880">點下即自動記錄</text>
+              <text x="35" y="280" font-size="11" fill="#6E6880">不用按儲存</text>
 
               <defs>
                 <marker id="arrow1" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 Z" fill="#8e8e93"/>
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#6E6880"/>
                 </marker>
               </defs>
             </svg>
@@ -1681,35 +1694,35 @@
             <p><strong>注意</strong>:卡費繳納不記入支出(刷卡時已逐筆記過);管理費等若開啟同步記支出,繳費時會自動產生一筆支出記錄。</p>
 
             <svg class="usage-diagram" viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
-              <rect x="20" y="10" width="260" height="50" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
-              <rect x="35" y="25" width="72" height="20" rx="10" fill="#8e8e93"/>
+              <rect x="20" y="10" width="260" height="50" rx="12" fill="#ffffff" stroke="#DDD6EA" stroke-width="2"/>
+              <rect x="35" y="25" width="72" height="20" rx="10" fill="#6E6880"/>
               <text x="71" y="39" text-anchor="middle" font-size="10" fill="#ffffff">待填金額</text>
-              <text x="117" y="39" font-size="11" fill="#1c1c1e">信用卡出帳前</text>
+              <text x="117" y="39" font-size="11" fill="#3D3A4A">信用卡出帳前</text>
 
-              <line x1="150" y1="62" x2="150" y2="83" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+              <line x1="150" y1="62" x2="150" y2="83" stroke="#6E6880" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
 
-              <rect x="20" y="86" width="260" height="50" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
-              <rect x="35" y="101" width="60" height="20" rx="10" fill="#ff3b30"/>
+              <rect x="20" y="86" width="260" height="50" rx="12" fill="#ffffff" stroke="#DDD6EA" stroke-width="2"/>
+              <rect x="35" y="101" width="60" height="20" rx="10" fill="#E07A5F"/>
               <text x="65" y="115" text-anchor="middle" font-size="10" fill="#ffffff">未繳</text>
-              <text x="105" y="115" font-size="11" fill="#1c1c1e">填入 $28,000</text>
+              <text x="105" y="115" font-size="11" fill="#3D3A4A">填入 $28,000</text>
 
-              <line x1="150" y1="138" x2="150" y2="159" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+              <line x1="150" y1="138" x2="150" y2="159" stroke="#6E6880" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
 
-              <rect x="20" y="162" width="260" height="50" rx="12" fill="#ffffff" stroke="#e5e5ea" stroke-width="2"/>
-              <rect x="35" y="177" width="72" height="20" rx="10" fill="#ff9500"/>
-              <text x="71" y="191" text-anchor="middle" font-size="10" fill="#ffffff">部分繳納</text>
-              <text x="117" y="191" font-size="11" fill="#1c1c1e">繳 $20,000</text>
+              <rect x="20" y="162" width="260" height="50" rx="12" fill="#ffffff" stroke="#DDD6EA" stroke-width="2"/>
+              <rect x="35" y="177" width="72" height="20" rx="10" fill="#EAC435"/>
+              <text x="71" y="191" text-anchor="middle" font-size="10" fill="#3D3A4A">部分繳納</text>
+              <text x="117" y="191" font-size="11" fill="#3D3A4A">繳 $20,000</text>
 
-              <line x1="150" y1="214" x2="150" y2="235" stroke="#8e8e93" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+              <line x1="150" y1="214" x2="150" y2="235" stroke="#6E6880" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
 
-              <rect x="20" y="238" width="260" height="70" rx="12" fill="#fff3e0" stroke="#ffcc80" stroke-width="2"/>
-              <text x="35" y="260" font-size="12" fill="#b25e00" font-weight="bold">⚠️ 滾入下期</text>
-              <text x="35" y="280" font-size="11" fill="#1c1c1e">未繳 $8,000 併入下期帳單</text>
-              <text x="35" y="297" font-size="10" fill="#8e8e93">下期顯示：本期+上期未繳=應繳</text>
+              <rect x="20" y="238" width="260" height="70" rx="12" fill="#FBF5D8" stroke="#F2E06B" stroke-width="2"/>
+              <text x="35" y="260" font-size="12" fill="#6B5D1A" font-weight="bold">⚠️ 滾入下期</text>
+              <text x="35" y="280" font-size="11" fill="#3D3A4A">未繳 $8,000 併入下期帳單</text>
+              <text x="35" y="297" font-size="10" fill="#6E6880">下期顯示：本期+上期未繳=應繳</text>
 
               <defs>
                 <marker id="arrow2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 Z" fill="#8e8e93"/>
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#6E6880"/>
                 </marker>
               </defs>
             </svg>
@@ -1839,7 +1852,7 @@
     ]
   };
 
-  const CHART_COLORS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#00c7be', '#007aff', '#5856d6', '#af52de', '#ff2d55', '#a2845e'];
+  const CHART_COLORS = ['#6B5B95', '#5B9279', '#EAC435', '#E07A5F', '#8E7CC3', '#7FA8C9', '#C98BA8', '#A08C5B', '#5F8FA3', '#B0A1D9'];
 
   let records = loadJSON(STORAGE_KEY, []);
   let customCategories = loadJSON(CUSTOM_CAT_KEY, { expense: [], income: [] });
@@ -4119,6 +4132,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-10', version: 'v2.13', title: '全新配色:淡紫+鵝黃柔和撞色', desc: '整體換裝:背景淡紫 #EDE8F5、主色/按鈕紫 #6B5B95、點綴鵝黃 #F2E06B(備份提醒、部分繳納等)；收入綠/支出紅改為 #5B9279/#E07A5F 色系(文字用途加深以符合 WCAG AA 對比，黃底一律深字)。進度圈固定段改紫色、變動段綠→黃→紅;圓餅圖、線圖、App 圖示與 PWA 主題色同步換色。每日線圖下方提示改為多行，並量化顯示超前/落後等速參考的金額、超過整月變動預算時以紅字標示超標金額。' },
     { date: '2026-07-10', version: 'v2.12', title: '圖表移至損益表頁', desc: '「本月支出比例」圓餅與「每日累計花費」線圖從記帳頁移到損益表頁，記帳頁回歸輸入本位:快速記帳+預算進度圈+歷史紀錄;損益表頁成為完整的分析頁:每月損益表在最上方，當月圖表接續在下。' },
     { date: '2026-07-09', version: 'v2.11', title: '首頁精簡、訂閱類別與帳單自動歸固定', desc: '移除首頁月摘要卡(收入/支出/結餘改到損益表頁查看)，首屏聚焦快速記帳與預算進度圈；新增內建支出類別「訂閱」(🔁)，預設計入固定支出。「應繳帳單」繳費產生的支出記錄現在自動計入預算的固定段(不看類別、過去已繳的也回溯適用)，固定類別勾選只留給不走帳單模組的固定支出。' },
     { date: '2026-07-09', version: 'v2.10', title: '損益表排版重新調整', desc: '每月列改為行動優先的兩層排版:左側月份與收支小字、右側大字損益(+/− 帶正負號變色)，並加上展開箭頭提示可點開明細；移除擁擠的四欄表頭。明細每個類別新增佔比百分比(支出類別佔當月支出、收入類別佔當月收入)，金額過長不再擠壓換行。' },
@@ -4996,10 +5010,10 @@
   });
 
   // ================= BUDGET (v2.9) =================
-  const BUDGET_FIXED_COLOR = '#9aa7b8'; // neutral blue-gray: fixed segment never carries a warning color
-  const BUDGET_SAFE_COLOR = '#34c759';
-  const BUDGET_WARN_COLOR = '#ff9500';
-  const BUDGET_DANGER_COLOR = '#ff3b30';
+  const BUDGET_FIXED_COLOR = '#6B5B95'; // palette purple: fixed segment never carries a warning color
+  const BUDGET_SAFE_COLOR = '#5B9279';
+  const BUDGET_WARN_COLOR = '#EAC435';
+  const BUDGET_DANGER_COLOR = '#E07A5F';
 
   function budgetFixedTotal() {
     return budget.fixedItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
@@ -5145,21 +5159,36 @@
 
     const idealToday = variableBudget * dayOfMonth / totalDays;
     const healthy = acc <= idealToday;
-    const areaColor = healthy ? 'rgba(52,199,89,0.12)' : 'rgba(255,59,48,0.12)';
+    const areaColor = healthy ? 'rgba(91,146,121,0.15)' : 'rgba(224,122,95,0.15)';
+
+    let statusLine = '';
+    if (variableBudget > 0) {
+      if (acc > variableBudget) {
+        statusLine = `<div class="daily-chart-status over">⚠️ 累計花費已超過整月變動預算 ${formatMoney(Math.round(acc - variableBudget))}</div>`;
+      } else if (!healthy) {
+        statusLine = `<div class="daily-chart-status over">⚠️ 花得比等速快:到今天為止已超標 ${formatMoney(Math.round(acc - idealToday))}</div>`;
+      } else {
+        statusLine = `<div class="daily-chart-status ok">✅ 進度健康:比等速參考少花 ${formatMoney(Math.round(idealToday - acc))}</div>`;
+      }
+    }
 
     wrap.innerHTML = `
       <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
         <line x1="${x(0)}" y1="${y(0)}" x2="${x(totalDays)}" y2="${y(0)}" stroke="var(--border)" stroke-width="1"/>
-        ${variableBudget > 0 ? `<line x1="${x(0).toFixed(1)}" y1="${y(0).toFixed(1)}" x2="${x(totalDays).toFixed(1)}" y2="${y(variableBudget).toFixed(1)}" stroke="#8e8e93" stroke-width="1.5" stroke-dasharray="5,4"/>` : ''}
+        ${variableBudget > 0 ? `<line x1="${x(0).toFixed(1)}" y1="${y(0).toFixed(1)}" x2="${x(totalDays).toFixed(1)}" y2="${y(variableBudget).toFixed(1)}" stroke="#6E6880" stroke-width="1.5" stroke-dasharray="5,4"/>` : ''}
         <polygon points="${areaPts}" fill="${areaColor}"/>
         <polyline points="${actualPts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
         <circle cx="${x(dayOfMonth).toFixed(1)}" cy="${y(acc).toFixed(1)}" r="4" fill="var(--accent)"/>
-        ${variableBudget > 0 ? `<text x="${(x(totalDays) - 4).toFixed(1)}" y="${(y(variableBudget) - 6).toFixed(1)}" text-anchor="end" font-size="10" fill="#8e8e93">預算 ${formatMoney(variableBudget)}</text>` : ''}
-        <text x="${x(1).toFixed(1)}" y="${H - 6}" font-size="10" fill="#8e8e93">1日</text>
-        <text x="${x(totalDays).toFixed(1)}" y="${H - 6}" text-anchor="end" font-size="10" fill="#8e8e93">${totalDays}日</text>
+        ${variableBudget > 0 ? `<text x="${(x(totalDays) - 4).toFixed(1)}" y="${(y(variableBudget) - 6).toFixed(1)}" text-anchor="end" font-size="10" fill="#6E6880">預算 ${formatMoney(variableBudget)}</text>` : ''}
+        <text x="${x(1).toFixed(1)}" y="${H - 6}" font-size="10" fill="#6E6880">1日</text>
+        <text x="${x(totalDays).toFixed(1)}" y="${H - 6}" text-anchor="end" font-size="10" fill="#6E6880">${totalDays}日</text>
         <text x="${x(dayOfMonth).toFixed(1)}" y="${(y(acc) - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="bold">${formatMoney(acc)}</text>
       </svg>
-      <div class="daily-chart-legend">實線＝實際累計變動支出 · 虛線＝等速消費參考線${healthy ? '（進度健康 ✅）' : '（花得比等速快 ⚠️）'}</div>
+      <div class="daily-chart-legend">
+        <div>實線＝實際累計變動支出</div>
+        <div>虛線＝等速消費參考線(變動預算平均分配到每天)</div>
+        ${statusLine}
+      </div>
     `;
   }
 
