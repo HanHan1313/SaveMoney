@@ -966,6 +966,7 @@
   .bill-card-top {
     display: flex;
     align-items: center;
+    gap: 6px;
     margin-bottom: 6px;
   }
   .bill-name {
@@ -973,11 +974,23 @@
     font-size: 16px;
     font-weight: 700;
   }
+  .bill-freq-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: rgba(107,91,149,0.13);
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .bill-freq-badge.quarterly { background: rgba(234,196,53,0.22); color: #6B5D1A; }
+  .bill-freq-badge.yearly { background: rgba(224,122,95,0.15); color: var(--expense); }
   .bill-status-badge {
     font-size: 11px;
     font-weight: 700;
     padding: 3px 10px;
     border-radius: 10px;
+    flex-shrink: 0;
   }
   .bill-status-badge.paid { background: rgba(91,146,121,0.15); color: var(--income); }
   .bill-status-badge.unpaid { background: rgba(224,122,95,0.15); color: var(--expense); }
@@ -4132,6 +4145,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-11', version: 'v2.14', title: '應繳帳單支援年繳/季繳週期', desc: '帳單類型新增「繳費週期」:月繳(預設)/季繳/年繳；年繳、季繳需另填到期月份(1-12)，只有在到期月份才產生本期帳單，不再每月重複產生(如汽燃費 7 月、房屋稅 5 月)。年繳/季繳帳單繳費仍正常建立支出記錄，但不會自動被算進預算的「固定已花」(避免課稅月份固定支出假性暴衝，比照房屋稅原則歸入變動)。已有期別產生的帳單，繳費週期和金額類型一樣鎖定不可更改。帳單卡片新增週期標籤(月繳/季繳/年繳)。' },
     { date: '2026-07-10', version: 'v2.13', title: '全新配色:淡紫+鵝黃柔和撞色', desc: '整體換裝:背景淡紫 #EDE8F5、主色/按鈕紫 #6B5B95、點綴鵝黃 #F2E06B(備份提醒、部分繳納等)；收入綠/支出紅改為 #5B9279/#E07A5F 色系(文字用途加深以符合 WCAG AA 對比，黃底一律深字)。進度圈固定段改紫色、變動段綠→黃→紅;圓餅圖、線圖、App 圖示與 PWA 主題色同步換色。每日線圖下方提示改為多行，並量化顯示超前/落後等速參考的金額、超過整月變動預算時以紅字標示超標金額。' },
     { date: '2026-07-10', version: 'v2.12', title: '圖表移至損益表頁', desc: '「本月支出比例」圓餅與「每日累計花費」線圖從記帳頁移到損益表頁，記帳頁回歸輸入本位:快速記帳+預算進度圈+歷史紀錄;損益表頁成為完整的分析頁:每月損益表在最上方，當月圖表接續在下。' },
     { date: '2026-07-09', version: 'v2.11', title: '首頁精簡、訂閱類別與帳單自動歸固定', desc: '移除首頁月摘要卡(收入/支出/結餘改到損益表頁查看)，首屏聚焦快速記帳與預算進度圈；新增內建支出類別「訂閱」(🔁)，預設計入固定支出。「應繳帳單」繳費產生的支出記錄現在自動計入預算的固定段(不看類別、過去已繳的也回溯適用)，固定類別勾選只留給不走帳單模組的固定支出。' },
@@ -4531,12 +4545,26 @@
     return Math.round((billTotalDue(inst) - billPaidAmount(inst)) * 100) / 100;
   }
 
+  // Whether `tpl` is due to generate a new instance in month `todayYm` given
+  // its billing frequency. monthly=every month; yearly=only tpl.dueMonth;
+  // quarterly=tpl.dueMonth and every 3rd month after it.
+  function isBillDueThisMonth(tpl, todayYm) {
+    const freq = tpl.frequency || 'monthly';
+    if (freq === 'monthly') return true;
+    const currentMonth = parseInt(todayYm.slice(5, 7), 10);
+    const dueMonth = tpl.dueMonth || 1;
+    if (freq === 'yearly') return currentMonth === dueMonth;
+    if (freq === 'quarterly') return ((currentMonth - dueMonth) % 3 + 3) % 3 === 0;
+    return true;
+  }
+
   function generateBillInstancesIfNeeded() {
     const todayYm = todayStr().slice(0, 7);
     let changed = false;
 
     billTemplates.forEach(tpl => {
       if (!tpl.active) return;
+      if (!isBillDueThisMonth(tpl, todayYm)) return;
       const existing = billInstances.find(inst => inst.templateId === tpl.id && inst.period === todayYm);
       if (existing) return;
 
@@ -4702,11 +4730,20 @@
   function buildBillEditForm(tpl, container) {
     const hasInstances = billInstances.some(i => i.templateId === tpl.id);
     const expenseCats = getCategories('expense');
+    const currentFreq = tpl.frequency || 'monthly';
     const amountTypeHtml = hasInstances
       ? `<div class="bill-amounttype-locked">金額類型:${tpl.amountType === 'fixed' ? '固定金額' : '每期填寫'}(已有期別產生，無法變更)</div>`
       : `<div class="type-toggle" id="editAmountType-${tpl.id}">
            <button type="button" class="${tpl.amountType === 'fixed' ? 'active' : ''}" data-type="fixed">固定金額</button>
            <button type="button" class="${tpl.amountType === 'variable' ? 'active' : ''}" data-type="variable">每期填寫(如信用卡)</button>
+         </div>`;
+    const freqLabels = { monthly: '月繳', quarterly: '季繳', yearly: '年繳' };
+    const freqHtml = hasInstances
+      ? `<div class="bill-amounttype-locked">繳費週期:${freqLabels[currentFreq]}(已有期別產生，無法變更)</div>`
+      : `<div class="type-toggle bill-freq-toggle" id="editFrequency-${tpl.id}">
+           <button type="button" class="${currentFreq === 'monthly' ? 'active' : ''}" data-freq="monthly">月繳</button>
+           <button type="button" class="${currentFreq === 'quarterly' ? 'active' : ''}" data-freq="quarterly">季繳</button>
+           <button type="button" class="${currentFreq === 'yearly' ? 'active' : ''}" data-freq="yearly">年繳</button>
          </div>`;
 
     container.innerHTML = `
@@ -4720,7 +4757,15 @@
         <input type="number" class="edit-tpl-amount" min="0" step="0.01" value="${tpl.defaultAmount || 0}">
       </div>
       <div class="field">
-        <label>繳款截止日(每月第幾天，1-31)</label>
+        <label>繳費週期</label>
+        ${freqHtml}
+      </div>
+      <div class="field edit-duemonth-wrap" style="${currentFreq === 'monthly' ? 'display:none;' : ''}">
+        <label>到期月份(1-12，季繳則每 3 個月循環一次)</label>
+        <input type="number" class="edit-tpl-duemonth" min="1" max="12" value="${tpl.dueMonth || ''}">
+      </div>
+      <div class="field">
+        <label>繳款截止日(到期月份的第幾天，1-31)</label>
         <input type="number" class="edit-tpl-dueday" min="1" max="31" value="${tpl.dueDay}">
       </div>
       <div class="field">
@@ -4751,6 +4796,17 @@
         });
       });
     }
+    let editingFrequency = currentFreq;
+    if (!hasInstances) {
+      container.querySelectorAll(`#editFrequency-${tpl.id} button`).forEach(btn => {
+        btn.addEventListener('click', () => {
+          container.querySelectorAll(`#editFrequency-${tpl.id} button`).forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          editingFrequency = btn.dataset.freq;
+          container.querySelector('.edit-duemonth-wrap').style.display = editingFrequency === 'monthly' ? 'none' : 'block';
+        });
+      });
+    }
     container.querySelector('.edit-tpl-createexpense').addEventListener('change', (e) => {
       container.querySelector('.edit-category-wrap').style.display = e.target.checked ? 'block' : 'none';
     });
@@ -4758,6 +4814,8 @@
     container.querySelector('.edit-tpl-save').addEventListener('click', () => {
       const name = container.querySelector('.edit-tpl-name').value.trim();
       const dueDay = parseInt(container.querySelector('.edit-tpl-dueday').value, 10);
+      const dueMonthInput = container.querySelector('.edit-tpl-duemonth');
+      const dueMonth = editingFrequency !== 'monthly' ? parseInt(dueMonthInput.value, 10) : null;
       const note = container.querySelector('.edit-tpl-note').value.trim();
       const createExpenseRecord = container.querySelector('.edit-tpl-createexpense').checked;
       const category = createExpenseRecord ? container.querySelector('.edit-tpl-category').value : null;
@@ -4765,17 +4823,21 @@
 
       if (!name) { showToast('請輸入帳單名稱'); return; }
       if (!dueDay || dueDay < 1 || dueDay > 31) { showToast('請輸入正確的繳款截止日(1-31)'); return; }
+      if (editingFrequency !== 'monthly' && (!dueMonth || dueMonth < 1 || dueMonth > 12)) { showToast('請輸入正確的到期月份(1-12)'); return; }
       if (editingAmountType === 'fixed' && (!defaultAmount || defaultAmount <= 0)) { showToast('請輸入每期金額'); return; }
 
       tpl.name = name;
       tpl.amountType = editingAmountType;
       tpl.defaultAmount = editingAmountType === 'fixed' ? defaultAmount : 0;
+      tpl.frequency = editingFrequency;
+      tpl.dueMonth = editingFrequency !== 'monthly' ? dueMonth : undefined;
       tpl.dueDay = dueDay;
       tpl.note = note || undefined;
       tpl.createExpenseRecord = createExpenseRecord;
       tpl.category = category;
 
       saveBillTemplates();
+      generateBillInstancesIfNeeded();
       showToast(`已更新「${name}」`);
       renderBillsPage();
       checkBillsReminder();
@@ -4793,7 +4855,12 @@
 
     const todayYm = todayStr().slice(0, 7);
 
+    const FREQ_LABELS = { monthly: '月繳', quarterly: '季繳', yearly: '年繳' };
+    const FREQ_BADGE_CLASS = { monthly: '', quarterly: 'quarterly', yearly: 'yearly' };
+
     billTemplates.forEach(tpl => {
+      const freq = tpl.frequency || 'monthly';
+      const freqBadgeHtml = `<div class="bill-freq-badge ${FREQ_BADGE_CLASS[freq]}">${FREQ_LABELS[freq]}</div>`;
       const inst = billInstances.find(i => i.templateId === tpl.id && i.period === todayYm);
       const noteHtml = tpl.note ? `<div class="history-note">${escapeHtml(tpl.note)}</div>` : '';
 
@@ -4810,6 +4877,7 @@
         card.innerHTML = `
           <div class="bill-card-top">
             <div class="bill-name">${escapeHtml(tpl.name)}</div>
+            ${freqBadgeHtml}
             <div class="bill-status-badge ${inst.status}">${statusLabel(inst.status)}</div>
           </div>
           ${noteHtml}
@@ -4851,6 +4919,7 @@
         card.innerHTML = `
           <div class="bill-card-top">
             <div class="bill-name">${escapeHtml(tpl.name)}</div>
+            ${freqBadgeHtml}
             <div class="bill-inactive-badge">${tpl.active ? '尚未產生期別' : '已停用'}</div>
           </div>
           ${noteHtml}
@@ -4942,7 +5011,19 @@
         <input type="number" id="billTplDefaultAmount" min="0" step="0.01" placeholder="0">
       </div>
       <div class="field">
-        <label>繳款截止日(每月第幾天，1-31)</label>
+        <label>繳費週期</label>
+        <div class="type-toggle bill-freq-toggle" id="billTplFrequency">
+          <button type="button" class="active" data-freq="monthly">月繳</button>
+          <button type="button" data-freq="quarterly">季繳</button>
+          <button type="button" data-freq="yearly">年繳</button>
+        </div>
+      </div>
+      <div class="field" id="billTplDueMonthWrap" style="display:none;">
+        <label>到期月份(1-12，季繳則每 3 個月循環一次)</label>
+        <input type="number" id="billTplDueMonth" min="1" max="12" placeholder="例如 7">
+      </div>
+      <div class="field">
+        <label>繳款截止日(到期月份的第幾天，1-31)</label>
         <input type="number" id="billTplDueDay" min="1" max="31" placeholder="例如 15">
       </div>
       <div class="field">
@@ -4963,12 +5044,21 @@
     `;
 
     let amountType = 'fixed';
+    let frequency = 'monthly';
     formWrap.querySelectorAll('#billTplAmountType button').forEach(btn => {
       btn.addEventListener('click', () => {
         formWrap.querySelectorAll('#billTplAmountType button').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         amountType = btn.dataset.type;
         el('billTplDefaultAmountWrap').style.display = amountType === 'fixed' ? 'block' : 'none';
+      });
+    });
+    formWrap.querySelectorAll('#billTplFrequency button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        formWrap.querySelectorAll('#billTplFrequency button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        frequency = btn.dataset.freq;
+        el('billTplDueMonthWrap').style.display = frequency === 'monthly' ? 'none' : 'block';
       });
     });
     el('billTplCreateExpense').addEventListener('change', () => {
@@ -4978,6 +5068,7 @@
     el('billTplSubmitBtn').addEventListener('click', () => {
       const name = el('billTplName').value.trim();
       const dueDay = parseInt(el('billTplDueDay').value, 10);
+      const dueMonth = frequency !== 'monthly' ? parseInt(el('billTplDueMonth').value, 10) : null;
       const note = el('billTplNote').value.trim();
       const createExpenseRecord = el('billTplCreateExpense').checked;
       const category = createExpenseRecord ? el('billTplCategory').value : null;
@@ -4985,6 +5076,7 @@
 
       if (!name) { showToast('請輸入帳單名稱'); return; }
       if (!dueDay || dueDay < 1 || dueDay > 31) { showToast('請輸入正確的繳款截止日(1-31)'); return; }
+      if (frequency !== 'monthly' && (!dueMonth || dueMonth < 1 || dueMonth > 12)) { showToast('請輸入正確的到期月份(1-12)'); return; }
       if (amountType === 'fixed' && (!defaultAmount || defaultAmount <= 0)) { showToast('請輸入每期金額'); return; }
 
       billTemplates.push({
@@ -4992,6 +5084,8 @@
         name,
         amountType,
         defaultAmount: amountType === 'fixed' ? defaultAmount : 0,
+        frequency,
+        dueMonth: frequency !== 'monthly' ? dueMonth : undefined,
         dueDay,
         note: note || undefined,
         category,
@@ -5019,14 +5113,24 @@
     return budget.fixedItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
   }
 
-  // Expense records created by paying a bill (應繳帳單) always count as fixed
-  // spending, regardless of their category. The linkage lives on the bill
-  // payments (payment.recordId), so this also applies to past payments.
+  // Expense records created by paying a MONTHLY bill (應繳帳單) always count
+  // as fixed spending, regardless of their category. The linkage lives on the
+  // bill payments (payment.recordId), so this also applies to past payments.
+  // Yearly/quarterly bills (e.g. 房屋稅、汽燃費) are deliberately excluded:
+  // counting their full amount as "fixed" would make that one month look
+  // like fixed spending spiked, which is exactly the false-alarm the original
+  // budget spec warned about for annual property tax. Their payment records
+  // still get created normally, they just fall through to variable spending
+  // (or to fixed only if the user separately puts their category in
+  // budget.fixedCategories).
   function billLinkedRecordIds() {
     const ids = new Set();
-    billInstances.forEach(inst => (inst.payments || []).forEach(p => {
-      if (p.recordId) ids.add(p.recordId);
-    }));
+    billInstances.forEach(inst => {
+      const tpl = billTemplates.find(t => t.id === inst.templateId);
+      const freq = tpl ? (tpl.frequency || 'monthly') : 'monthly';
+      if (freq !== 'monthly') return;
+      (inst.payments || []).forEach(p => { if (p.recordId) ids.add(p.recordId); });
+    });
     return ids;
   }
 
