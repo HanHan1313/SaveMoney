@@ -610,84 +610,6 @@
   }
   .holding-history-item:last-child { border-bottom: none; }
 
-  /* ---- Screenshots ---- */
-  .screenshot-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-top: 14px;
-  }
-  .screenshot-thumb {
-    position: relative;
-    padding-top: 100%;
-    border-radius: 10px;
-    overflow: hidden;
-    background: var(--bg);
-  }
-  .screenshot-thumb img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .screenshot-thumb .shot-date {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(0,0,0,0.55);
-    color: #fff;
-    font-size: 10px;
-    text-align: center;
-    padding: 2px 0;
-  }
-  .screenshot-thumb .shot-ocr {
-    position: absolute;
-    top: 4px; left: 4px;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    border: none;
-    font-size: 12px;
-    line-height: 1;
-  }
-  .screenshot-thumb .shot-del {
-    position: absolute;
-    top: 4px; right: 4px;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    border: none;
-    font-size: 12px;
-    line-height: 1;
-  }
-  .lightbox {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-  }
-  .lightbox.open { display: flex; }
-  .lightbox img {
-    max-width: 92vw;
-    max-height: 80vh;
-    border-radius: 12px;
-  }
-  .lightbox-close {
-    position: absolute;
-    top: 20px; right: 20px;
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.15);
-    color: #fff;
-    border: none;
-    font-size: 20px;
-  }
-
   /* ---- CSV import preview ---- */
   .csv-row-wrap {
     border-bottom: 1px solid var(--border);
@@ -806,55 +728,12 @@
     text-align: center;
   }
 
-  /* ---- OCR candidate preview ---- */
+  /* ---- OCR/preview note text (shared with CSV import preview) ---- */
   .ocr-note {
     font-size: 12px;
     color: var(--sub-text);
     margin-bottom: 12px;
     line-height: 1.6;
-  }
-  .ocr-candidate {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px;
-    margin-bottom: 10px;
-  }
-  .ocr-candidate-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .ocr-candidate-header input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-  }
-  .ocr-candidate-header .ocr-name {
-    flex: 1;
-    min-width: 0;
-    font-size: 15px;
-    font-weight: 600;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
-    color: var(--text);
-  }
-  .ocr-candidate-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 6px;
-  }
-  .ocr-candidate-fields input {
-    font-size: 13px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
-    color: var(--text);
-    text-align: center;
-    min-width: 0;
   }
 
   /* ---- Backup reminder banner ---- */
@@ -1687,14 +1566,6 @@
       <h2>資產變化</h2>
       <div id="investChartWrap"></div>
     </div>
-
-    <div class="card">
-      <h2>持股截圖</h2>
-      <input type="file" id="screenshotFile" accept="image/*" style="display:none">
-      <button type="button" class="submit-btn btn-outline" id="screenshotUploadBtn">📷 上傳持股截圖</button>
-      <div class="screenshot-grid" id="screenshotGrid"></div>
-      <div id="ocrPreview" style="margin-top:14px;"></div>
-    </div>
   </div>
 
   <!-- ============ PAGE: BILLS ============ -->
@@ -1870,11 +1741,11 @@
         <div class="usage-section">
           <button type="button" class="usage-section-toggle" data-target="usage-investment">📈 投資頁 — 持股總覽 <span class="accordion-arrow">▾</span></button>
           <div class="usage-section-body" id="usage-investment">
-            <p><strong>這一頁做什麼</strong>:記錄股票/ETF 持股與損益。</p>
+            <p><strong>這一頁做什麼</strong>:記錄股票/ETF 持股與損益,並累積每月快照看資產走勢。</p>
             <ul>
               <li>手動新增:名稱、股數、成本價、現價</li>
-              <li>快速更新:券商 App 庫存截圖交給 Claude 轉成備份檔 → 設定頁匯入合併,不用逐筆改</li>
-              <li>可保存庫存截圖作為對照</li>
+              <li>快速更新:「貼上更新持股」貼上券商 App 複製的表格文字(股名/股數/成本價/現價),一次解析多檔,預覽新增/更新/無變動後再套用,不用逐筆改</li>
+              <li>更新完按「儲存本月快照」,累積 2 個月以上就能在「資產變化」看到總市值/總成本趨勢與月度漲跌</li>
             </ul>
           </div>
         </div>
@@ -1947,13 +1818,6 @@
 <div class="toast" id="toast"></div>
 <datalist id="splitNamesList"></datalist>
 
-<!-- Lightbox for screenshots -->
-<div class="lightbox" id="lightbox">
-  <button type="button" class="lightbox-close" id="lightboxClose">✕</button>
-  <img id="lightboxImg" src="" alt="持股截圖">
-</div>
-
-<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (function () {
   const STORAGE_KEY = 'expenseTrackerRecords';
@@ -4083,7 +3947,6 @@
       });
     }
 
-    renderScreenshots();
     renderInvestChart();
   }
 
@@ -4322,221 +4185,6 @@
     }
   });
 
-  // ================= INVESTMENT SCREENSHOTS =================
-  el('screenshotUploadBtn').addEventListener('click', () => el('screenshotFile').click());
-  el('screenshotFile').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onerror = () => {
-      alert('讀取檔案失敗，請換一張圖片再試一次');
-    };
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onerror = () => {
-        alert('這張圖片無法解析(可能是不支援的格式，例如 HEIC)，請改用截圖或轉成 JPG/PNG 後再上傳');
-      };
-      img.onload = () => {
-        try {
-          const maxW = 900;
-          const scale = Math.min(1, maxW / img.width);
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-          screenshots.push({
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-            dataUrl,
-            date: todayStr()
-          });
-          try {
-            saveScreenshots();
-          } catch (err) {
-            screenshots.pop();
-            alert('儲存空間已滿，請先刪除部分截圖再試一次');
-            return;
-          }
-          renderScreenshots();
-        } catch (err) {
-          alert('處理圖片時發生錯誤：' + err.message);
-        }
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  });
-
-  function renderScreenshots() {
-    const grid = el('screenshotGrid');
-    grid.innerHTML = '';
-    if (screenshots.length === 0) {
-      grid.innerHTML = '<div class="empty-note">尚未上傳任何截圖</div>';
-      return;
-    }
-    screenshots.slice().reverse().forEach(s => {
-      const thumb = document.createElement('div');
-      thumb.className = 'screenshot-thumb';
-      thumb.innerHTML = `
-        <img src="${s.dataUrl}" alt="持股截圖">
-        <div class="shot-date">${s.date}</div>
-        <button type="button" class="shot-ocr" title="辨識並匯入持股">🔍</button>
-        <button type="button" class="shot-del">×</button>
-      `;
-      thumb.querySelector('img').addEventListener('click', () => openLightbox(s.dataUrl));
-      thumb.querySelector('.shot-ocr').addEventListener('click', (e) => {
-        e.stopPropagation();
-        runOcrOnScreenshot(s.dataUrl, e.currentTarget);
-      });
-      thumb.querySelector('.shot-del').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!confirm('刪除這張截圖？')) return;
-        screenshots = screenshots.filter(x => x.id !== s.id);
-        saveScreenshots();
-        renderScreenshots();
-      });
-      grid.appendChild(thumb);
-    });
-  }
-
-  // ================= OCR: screenshot -> holdings =================
-  async function runOcrOnScreenshot(dataUrl, btn) {
-    if (typeof Tesseract === 'undefined') {
-      alert('OCR 元件載入失敗，請確認網路連線後重新整理頁面再試一次');
-      return;
-    }
-    const originalText = btn.textContent;
-    btn.textContent = '⏳';
-    btn.disabled = true;
-    el('ocrPreview').innerHTML = '<div class="empty-note">🔍 辨識中，請稍候…(第一次使用需下載辨識模型，可能需要一點時間)</div>';
-
-    try {
-      const { data: { text } } = await Tesseract.recognize(dataUrl, 'chi_tra+eng');
-      const rows = parseOcrToHoldings(text);
-      renderOcrPreview(rows);
-    } catch (err) {
-      el('ocrPreview').innerHTML = '<div class="empty-note">辨識失敗，請確認網路連線後再試一次</div>';
-    } finally {
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }
-  }
-
-  function parseOcrToHoldings(text) {
-    const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
-    const rows = [];
-
-    lines.forEach(line => {
-      const numbers = (line.match(/-?\d[\d,]*\.?\d*/g) || [])
-        .map(s => parseFloat(s.replace(/,/g, '')))
-        .filter(n => !isNaN(n));
-
-      if (numbers.length === 0) return;
-
-      const nameCandidate = line
-        .replace(/-?\d[\d,]*\.?\d*/g, '')
-        .replace(/[|,:：\-+%()（）．.]/g, '')
-        .trim();
-
-      if (nameCandidate.length < 2) return;
-
-      rows.push({
-        name: nameCandidate,
-        shares: numbers[0] !== undefined ? numbers[0] : '',
-        costPrice: numbers[1] !== undefined ? numbers[1] : '',
-        currentPrice: numbers[2] !== undefined ? numbers[2] : (numbers[1] !== undefined ? numbers[1] : ''),
-        confident: numbers.length >= 2
-      });
-    });
-
-    return rows;
-  }
-
-  function renderOcrPreview(rows) {
-    const wrap = el('ocrPreview');
-    wrap.innerHTML = '';
-
-    if (rows.length === 0) {
-      wrap.innerHTML = '<div class="empty-note">這張截圖沒有辨識出可用的持股資料，請直接手動新增</div>';
-      return;
-    }
-
-    const note = document.createElement('div');
-    note.className = 'ocr-note';
-    note.textContent = '以下為自動辨識結果，可能有誤判，請確認或修改每一筆的名稱/股數/價格後再匯入(未勾選的項目不會匯入)';
-    wrap.appendChild(note);
-
-    rows.forEach(row => {
-      const card = document.createElement('div');
-      card.className = 'ocr-candidate';
-      card.innerHTML = `
-        <div class="ocr-candidate-header">
-          <input type="checkbox" class="ocr-check" ${row.confident ? 'checked' : ''}>
-          <input type="text" class="ocr-name" value="${escapeHtml(row.name)}" placeholder="股票名稱/代號">
-        </div>
-        <div class="ocr-candidate-fields">
-          <input type="number" class="ocr-shares" value="${row.shares}" placeholder="股數" min="0" step="1">
-          <input type="number" class="ocr-cost" value="${row.costPrice}" placeholder="成本價" min="0" step="0.01">
-          <input type="number" class="ocr-price" value="${row.currentPrice}" placeholder="目前股價" min="0" step="0.01">
-        </div>
-      `;
-      wrap.appendChild(card);
-    });
-
-    const actions = document.createElement('div');
-    actions.style.cssText = 'display:flex;gap:10px;margin-top:4px;';
-    actions.innerHTML = `
-      <button type="button" class="submit-btn" id="ocrConfirmBtn" style="flex:1;">確認匯入已勾選項目</button>
-      <button type="button" class="submit-btn btn-outline" id="ocrCancelBtn" style="flex:1;">取消</button>
-    `;
-    wrap.appendChild(actions);
-
-    el('ocrConfirmBtn').addEventListener('click', confirmOcrImport);
-    el('ocrCancelBtn').addEventListener('click', () => { wrap.innerHTML = ''; });
-  }
-
-  function confirmOcrImport() {
-    const cards = document.querySelectorAll('#ocrPreview .ocr-candidate');
-    let count = 0;
-
-    cards.forEach(card => {
-      if (!card.querySelector('.ocr-check').checked) return;
-      const name = card.querySelector('.ocr-name').value.trim();
-      const shares = parseFloat(card.querySelector('.ocr-shares').value);
-      const cost = parseFloat(card.querySelector('.ocr-cost').value);
-      const price = parseFloat(card.querySelector('.ocr-price').value);
-      if (!name || !shares || shares <= 0 || isNaN(cost) || isNaN(price)) return;
-
-      investments.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        name, shares, costPrice: cost, currentPrice: price
-      });
-      count++;
-    });
-
-    saveInvestments();
-    el('ocrPreview').innerHTML = `<div class="empty-note">已成功匯入 ${count} 檔持股</div>`;
-    renderInvestments();
-  }
-
-  function openLightbox(src) {
-    el('lightboxImg').src = src;
-    el('lightbox').classList.add('open');
-  }
-  function closeLightbox() {
-    el('lightbox').classList.remove('open');
-    el('lightboxImg').src = '';
-  }
-  el('lightboxClose').addEventListener('click', closeLightbox);
-  el('lightbox').addEventListener('click', (e) => {
-    if (e.target.id === 'lightbox') closeLightbox();
-  });
-
   // ================= ACCORDIONS (usage guide / changelog / collapsible cards) =================
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.accordion-toggle, .usage-section-toggle');
@@ -4549,6 +4197,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-30', version: 'v2.17', title: '移除投資頁持股截圖功能', desc: '截圖上傳/OCR 辨識/縮圖牆與燈箱瀏覽已從投資頁移除，改由「貼上更新持股」+「儲存本月快照」取代(用途重疊但更準確、有歷史軌跡)。舊備份的 screenshots 欄位仍可正常匯入合併，只是不再有介面可上傳新截圖或瀏覽；如需保留既有截圖，先用「匯出並分享備份檔」留一份即可。' },
     { date: '2026-07-30', version: 'v2.16', title: '分帳總覽明細分頁', desc: '「全部明細」與展開的成員卡片明細改為每 10 筆一頁，底部提供「載入更多」(手機優先，較省空間)；切換待結/已結清分頁或重新展開成員卡片會重置回前 10 筆。標記已結清後名單自動變短，不會出現空白頁。頁籤上的「N 筆待結」徽章維持顯示總數，不受分頁影響。成員卡片新增「全部結清」時會先跳出確認提示再執行。' },
     { date: '2026-07-22', version: 'v2.15', title: '投資持股快照歷史與貼上更新', desc: '投資頁新增「貼上更新持股」:貼上券商表格文字(股名/股數/成本價[可省略]/現價，Tab 或多空白分隔)即可一次解析多檔，預覽標示新增/更新/無變動，貼上資料未包含的持股可選擇保留或視為已出清，取代逐筆手動修改。新增「儲存本月快照」:記錄當下總市值/總成本/報酬率與每檔明細，同月重複儲存以最新覆蓋。新增「資產變化」折線圖(總市值實線、總成本虛線疊加)與月度漲跌對比，未滿 2 筆快照顯示累積中；持股明細可展開單檔歷月市值。快照納入備份，以 id 去重不覆蓋既有快照。' },
     { date: '2026-07-11', version: 'v2.14', title: '應繳帳單支援年繳/季繳週期', desc: '帳單類型新增「繳費週期」:月繳(預設)/季繳/年繳；年繳、季繳需另填到期月份(1-12)，只有在到期月份才產生本期帳單，不再每月重複產生(如汽燃費 7 月、房屋稅 5 月)。年繳/季繳帳單繳費仍正常建立支出記錄，但不會自動被算進預算的「固定已花」(避免課稅月份固定支出假性暴衝，比照房屋稅原則歸入變動)。已有期別產生的帳單，繳費週期和金額類型一樣鎖定不可更改。帳單卡片新增週期標籤(月繳/季繳/年繳)。' },
