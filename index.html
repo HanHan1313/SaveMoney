@@ -503,6 +503,113 @@
   }
   .holding-actions button.del { color: var(--expense); }
 
+  .snapshot-save-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 14px;
+    margin-top: 10px;
+  }
+  .snapshot-save-btn:active { opacity: 0.85; }
+
+  /* ---- Paste-to-update holdings ---- */
+  .field textarea {
+    width: 100%;
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+  }
+  .field textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .paste-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .paste-row:last-child { border-bottom: none; }
+  .paste-row .p-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .paste-row .p-detail { font-size: 12px; color: var(--sub-text); }
+  .paste-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .paste-status-badge.new { background: rgba(91,146,121,0.15); color: var(--income); }
+  .paste-status-badge.update { background: rgba(234,196,53,0.22); color: #6B5D1A; }
+  .paste-status-badge.same { background: rgba(110,104,128,0.15); color: var(--sub-text); }
+  .paste-status-badge.error { background: rgba(224,122,95,0.15); color: var(--expense); }
+  .paste-missing-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .paste-missing-row:last-child { border-bottom: none; }
+  .paste-missing-row label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sub-text); flex-shrink: 0; }
+  .paste-section-label { font-size: 12px; font-weight: 700; color: var(--sub-text); margin: 12px 0 4px; }
+
+  /* ---- Investment snapshot chart ---- */
+  .invest-compare {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .invest-compare.up { color: var(--income); }
+  .invest-compare.down { color: var(--expense); }
+  .invest-chart-legend {
+    font-size: 11px;
+    color: var(--sub-text);
+    text-align: center;
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+  .holding-history-toggle {
+    width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--sub-text);
+    margin-top: 8px;
+  }
+  .holding-history-list {
+    display: none;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .holding-history-list.open { display: block; }
+  .holding-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .holding-history-item:last-child { border-bottom: none; }
+
   /* ---- Screenshots ---- */
   .screenshot-grid {
     display: grid;
@@ -1533,6 +1640,19 @@
         </div>
       </div>
       <button class="share-btn" id="shareBtn">📤 分享目前股票狀況</button>
+      <button class="snapshot-save-btn" id="saveSnapshotBtn">📌 儲存本月快照</button>
+    </div>
+
+    <div class="card">
+      <button type="button" class="accordion-toggle" data-target="pasteHoldingsBody">📋 貼上更新持股 <span class="accordion-arrow">▾</span></button>
+      <div class="accordion-body" id="pasteHoldingsBody">
+        <div class="settings-desc">從券商 App 複製表格文字貼上，每行一檔，欄位以 Tab 或多個空白分隔:「股名　股數　成本價　現價」。成本價可省略(省略時保留原值)。</div>
+        <div class="field">
+          <textarea id="pasteHoldingsInput" rows="5" placeholder="0050&#9;782&#9;71.46&#9;108.5"></textarea>
+        </div>
+        <button type="button" class="submit-btn btn-outline" id="pasteHoldingsParseBtn">解析預覽</button>
+        <div id="pasteHoldingsPreview" style="margin-top:14px;"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -1561,6 +1681,11 @@
     <div class="card investment-section">
       <h2>持股明細</h2>
       <div id="holdingsList"></div>
+    </div>
+
+    <div class="card">
+      <h2>資產變化</h2>
+      <div id="investChartWrap"></div>
     </div>
 
     <div class="card">
@@ -1834,6 +1959,7 @@
   const STORAGE_KEY = 'expenseTrackerRecords';
   const CUSTOM_CAT_KEY = 'expenseTrackerCustomCategories';
   const INVEST_KEY = 'investmentHoldings';
+  const INVEST_SNAPSHOTS_KEY = 'investmentSnapshots';
   const SCREENSHOT_KEY = 'investmentScreenshots';
   const CATEGORY_USAGE_KEY = 'expenseTrackerCategoryUsage';
   const LAST_BACKUP_KEY = 'expenseTrackerLastBackupAt';
@@ -1870,6 +1996,7 @@
   let records = loadJSON(STORAGE_KEY, []);
   let customCategories = loadJSON(CUSTOM_CAT_KEY, { expense: [], income: [] });
   let investments = loadJSON(INVEST_KEY, []);
+  let investmentSnapshots = loadJSON(INVEST_SNAPSHOTS_KEY, []);
   let screenshots = loadJSON(SCREENSHOT_KEY, []);
   let categoryUsage = loadJSON(CATEGORY_USAGE_KEY, { expense: {}, income: {} });
   let manualDebts = loadJSON(MANUAL_DEBT_KEY, []);
@@ -1903,6 +2030,7 @@
   function saveRecords() { save(STORAGE_KEY, records); }
   function saveCustomCategories() { save(CUSTOM_CAT_KEY, customCategories); }
   function saveInvestments() { save(INVEST_KEY, investments); }
+  function saveInvestmentSnapshots() { save(INVEST_SNAPSHOTS_KEY, investmentSnapshots); }
   function saveScreenshots() { save(SCREENSHOT_KEY, screenshots); }
   function saveCategoryUsage() { save(CATEGORY_USAGE_KEY, categoryUsage); }
   function saveManualDebts() { save(MANUAL_DEBT_KEY, manualDebts); }
@@ -3876,11 +4004,237 @@
           renderInvestments();
         });
 
+        const histBtn = document.createElement('button');
+        histBtn.type = 'button';
+        histBtn.className = 'holding-history-toggle';
+        histBtn.textContent = '📜 歷月市值';
+        const histList = document.createElement('div');
+        histList.className = 'holding-history-list';
+
+        histBtn.addEventListener('click', () => {
+          histList.classList.toggle('open');
+          if (!histList.classList.contains('open')) return;
+          const rows = investmentSnapshots
+            .slice()
+            .sort((a, b) => b.period.localeCompare(a.period))
+            .map(s => ({ period: s.period, holding: (s.holdings || []).find(hd => hd.name === h.name) }))
+            .filter(r => r.holding);
+          if (rows.length === 0) {
+            histList.innerHTML = '<div class="empty-note">尚無此檔的歷史快照</div>';
+            return;
+          }
+          histList.innerHTML = rows.map(r => `<div class="holding-history-item"><span>${r.period}</span><span>${r.holding.shares} 股 @ ${r.holding.currentPrice} ・市值 ${formatMoney(r.holding.marketValue)}</span></div>`).join('');
+        });
+
+        item.appendChild(histBtn);
+        item.appendChild(histList);
+
         list.appendChild(item);
       });
     }
 
     renderScreenshots();
+    renderInvestChart();
+  }
+
+  // ================= INVESTMENT SNAPSHOTS (v2.15) =================
+  function saveInvestmentSnapshot(silent) {
+    if (investments.length === 0) { if (!silent) showToast('尚無持股可儲存快照'); return; }
+    const period = todayStr().slice(0, 7);
+    const { totalValue, totalCost } = investStats();
+    const totalReturn = totalCost > 0 ? Math.round((totalValue - totalCost) / totalCost * 10000) / 100 : 0;
+    const holdings = investments.map(h => ({
+      name: h.name,
+      shares: h.shares,
+      costPrice: h.costPrice,
+      currentPrice: h.currentPrice,
+      marketValue: Math.round(h.shares * h.currentPrice * 100) / 100
+    }));
+
+    const existingIdx = investmentSnapshots.findIndex(s => s.period === period);
+    const snap = {
+      id: existingIdx >= 0 ? investmentSnapshots[existingIdx].id : genId(),
+      date: todayStr(),
+      period,
+      totalCost: Math.round(totalCost * 100) / 100,
+      totalValue: Math.round(totalValue * 100) / 100,
+      totalReturn,
+      holdings
+    };
+    if (existingIdx >= 0) investmentSnapshots[existingIdx] = snap;
+    else investmentSnapshots.push(snap);
+    saveInvestmentSnapshots();
+    if (!silent) showToast(existingIdx >= 0 ? `已更新本月(${period})快照` : `已儲存本月(${period})快照`);
+    renderInvestChart();
+  }
+
+  el('saveSnapshotBtn').addEventListener('click', () => saveInvestmentSnapshot(false));
+
+  function renderInvestChart() {
+    const wrap = el('investChartWrap');
+    if (!wrap) return;
+    const snaps = investmentSnapshots.slice().sort((a, b) => a.period.localeCompare(b.period));
+
+    if (snaps.length < 2) {
+      wrap.innerHTML = '<div class="empty-note">持續累積中，下月即可看到變化</div>';
+      return;
+    }
+
+    const W = 320, H = 190, padL = 10, padR = 14, padT = 16, padB = 22;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const maxY = Math.max(...snaps.map(s => Math.max(s.totalValue, s.totalCost)), 1) * 1.08;
+    const n = snaps.length;
+    const x = i => padL + (n === 1 ? 0 : (i / (n - 1)) * plotW);
+    const y = v => padT + plotH - (v / maxY) * plotH;
+
+    const valuePts = snaps.map((s, i) => `${x(i).toFixed(1)},${y(s.totalValue).toFixed(1)}`).join(' ');
+    const costPts = snaps.map((s, i) => `${x(i).toFixed(1)},${y(s.totalCost).toFixed(1)}`).join(' ');
+
+    const first = snaps[0];
+    const last = snaps[n - 1];
+
+    const monthTicks = snaps.map((s, i) => {
+      const short = s.period.slice(5, 7) + '月';
+      const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
+      return `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="${anchor}" font-size="10" fill="#8e8e93">${short}</text>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <line x1="${x(0)}" y1="${y(0)}" x2="${x(n - 1)}" y2="${y(0)}" stroke="var(--border)" stroke-width="1"/>
+        <polyline points="${costPts}" fill="none" stroke="#8e8e93" stroke-width="2" stroke-dasharray="5,4"/>
+        <polyline points="${valuePts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+        ${snaps.map((s, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(s.totalValue).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join('')}
+        ${monthTicks}
+        <text x="${x(n - 1).toFixed(1)}" y="${(y(last.totalValue) - 8).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--accent)" font-weight="bold">${formatMoney(last.totalValue)}</text>
+      </svg>
+      <div class="invest-chart-legend">實線＝總市值 · 虛線＝總成本(兩線差距即未實現損益，含手續費/股利誤差，僅供趨勢參考)</div>
+    `;
+
+    const diff = Math.round((last.totalValue - (n >= 2 ? snaps[n - 2].totalValue : first.totalValue)) * 100) / 100;
+    const prev = snaps[n - 2];
+    const diffPct = prev.totalValue > 0 ? (diff / prev.totalValue) * 100 : 0;
+    const up = diff >= 0;
+    const compare = document.createElement('div');
+    compare.className = `invest-compare ${up ? 'up' : 'down'}`;
+    compare.textContent = `較上月(${prev.period}) ${up ? '+' : ''}${formatMoney(diff)} (${up ? '+' : ''}${diffPct.toFixed(1)}%)`;
+    wrap.appendChild(compare);
+  }
+
+  // ---- Paste-to-update holdings ----
+  function parseHoldingLine(line) {
+    let parts = line.split('\t').map(s => s.trim()).filter(Boolean);
+    if (parts.length < 2) parts = line.split(/ {2,}/).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      const tokens = line.trim().split(/\s+/);
+      const numIdx = tokens.findIndex(t => /^-?\d+(\.\d+)?$/.test(t));
+      parts = numIdx > 0 ? [tokens.slice(0, numIdx).join(' '), ...tokens.slice(numIdx)] : tokens;
+    }
+    if (parts.length < 3) return null;
+
+    const name = parts[0];
+    let shares, costPrice, currentPrice;
+    if (parts.length >= 4) {
+      shares = parseFloat(parts[1]);
+      const costRaw = parseFloat(parts[2]);
+      costPrice = isNaN(costRaw) ? null : costRaw;
+      currentPrice = parseFloat(parts[3]);
+    } else {
+      shares = parseFloat(parts[1]);
+      costPrice = null;
+      currentPrice = parseFloat(parts[2]);
+    }
+    if (!name || isNaN(shares) || isNaN(currentPrice)) return null;
+    return { name, shares, costPrice, currentPrice };
+  }
+
+  let pastePreviewState = null;
+
+  el('pasteHoldingsParseBtn').addEventListener('click', () => {
+    const text = el('pasteHoldingsInput').value;
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) { showToast('請先貼上持股資料'); return; }
+
+    const seenNames = new Set();
+    const rows = lines.map(line => {
+      const parsed = parseHoldingLine(line);
+      if (!parsed) return { error: true, raw: line };
+      seenNames.add(parsed.name);
+      const existing = investments.find(h => h.name === parsed.name);
+      let status;
+      if (!existing) status = 'new';
+      else {
+        const sharesChanged = existing.shares !== parsed.shares;
+        const priceChanged = existing.currentPrice !== parsed.currentPrice;
+        const costChanged = parsed.costPrice !== null && existing.costPrice !== parsed.costPrice;
+        status = (sharesChanged || priceChanged || costChanged) ? 'update' : 'same';
+      }
+      return Object.assign({ error: false, existing, status }, parsed);
+    });
+    const missing = investments.filter(h => !seenNames.has(h.name));
+    pastePreviewState = { rows, missing };
+    renderPastePreview();
+  });
+
+  function renderPastePreview() {
+    const wrap = el('pasteHoldingsPreview');
+    if (!pastePreviewState) { wrap.innerHTML = ''; return; }
+    const { rows, missing } = pastePreviewState;
+    const labels = { new: '新增', update: '更新', same: '無變動', error: '無法解析' };
+
+    let html = '<div class="paste-section-label">解析結果</div>';
+    html += rows.map(r => {
+      if (r.error) {
+        return `<div class="paste-row"><div class="p-name">${escapeHtml(r.raw)}</div><div class="paste-status-badge error">${labels.error}</div></div>`;
+      }
+      const detail = r.status === 'new'
+        ? `${r.shares} 股 @ ${r.currentPrice}`
+        : `${r.existing.shares}${r.status === 'update' && r.existing.shares !== r.shares ? '→' + r.shares : ''} 股 @ ${r.existing.currentPrice}${r.status === 'update' && r.existing.currentPrice !== r.currentPrice ? '→' + r.currentPrice : ''}`;
+      return `<div class="paste-row"><div class="p-name">${escapeHtml(r.name)}<div class="p-detail">${detail}</div></div><div class="paste-status-badge ${r.status}">${labels[r.status]}</div></div>`;
+    }).join('');
+
+    if (missing.length > 0) {
+      html += '<div class="paste-section-label">貼上資料中未包含(保留或視為已出清)</div>';
+      html += missing.map(h => `
+        <div class="paste-missing-row" data-id="${h.id}">
+          <div class="p-name">${escapeHtml(h.name)}</div>
+          <label><input type="checkbox" class="paste-sold-cb"> 視為已出清</label>
+        </div>
+      `).join('');
+    }
+
+    html += '<button type="button" class="submit-btn" id="pasteHoldingsApplyBtn" style="margin-top:12px;">確認套用</button>';
+    wrap.innerHTML = html;
+
+    el('pasteHoldingsApplyBtn').addEventListener('click', () => {
+      const soldIds = new Set(
+        Array.from(wrap.querySelectorAll('.paste-missing-row')).filter(row => row.querySelector('.paste-sold-cb').checked).map(row => row.dataset.id)
+      );
+      let added = 0, updated = 0, removed = 0;
+      rows.forEach(r => {
+        if (r.error) return;
+        if (r.status === 'new') {
+          investments.push({ id: genId(), name: r.name, shares: r.shares, costPrice: r.costPrice !== null ? r.costPrice : 0, currentPrice: r.currentPrice });
+          added++;
+        } else if (r.status === 'update') {
+          r.existing.shares = r.shares;
+          r.existing.currentPrice = r.currentPrice;
+          if (r.costPrice !== null) r.existing.costPrice = r.costPrice;
+          updated++;
+        }
+      });
+      if (soldIds.size > 0) {
+        investments = investments.filter(h => !soldIds.has(h.id));
+        removed = soldIds.size;
+      }
+      saveInvestments();
+      showToast(`已套用:新增 ${added}、更新 ${updated}、移除 ${removed}`);
+      el('pasteHoldingsInput').value = '';
+      pastePreviewState = null;
+      wrap.innerHTML = '';
+      renderInvestments();
+      if (confirm('已套用持股更新，要一併儲存本月快照嗎？')) saveInvestmentSnapshot(false);
+    });
   }
 
   el('shareBtn').addEventListener('click', async () => {
@@ -4145,6 +4499,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-22', version: 'v2.15', title: '投資持股快照歷史與貼上更新', desc: '投資頁新增「貼上更新持股」:貼上券商表格文字(股名/股數/成本價[可省略]/現價，Tab 或多空白分隔)即可一次解析多檔，預覽標示新增/更新/無變動，貼上資料未包含的持股可選擇保留或視為已出清，取代逐筆手動修改。新增「儲存本月快照」:記錄當下總市值/總成本/報酬率與每檔明細，同月重複儲存以最新覆蓋。新增「資產變化」折線圖(總市值實線、總成本虛線疊加)與月度漲跌對比，未滿 2 筆快照顯示累積中；持股明細可展開單檔歷月市值。快照納入備份，以 id 去重不覆蓋既有快照。' },
     { date: '2026-07-11', version: 'v2.14', title: '應繳帳單支援年繳/季繳週期', desc: '帳單類型新增「繳費週期」:月繳(預設)/季繳/年繳；年繳、季繳需另填到期月份(1-12)，只有在到期月份才產生本期帳單，不再每月重複產生(如汽燃費 7 月、房屋稅 5 月)。年繳/季繳帳單繳費仍正常建立支出記錄，但不會自動被算進預算的「固定已花」(避免課稅月份固定支出假性暴衝，比照房屋稅原則歸入變動)。已有期別產生的帳單，繳費週期和金額類型一樣鎖定不可更改。帳單卡片新增週期標籤(月繳/季繳/年繳)。' },
     { date: '2026-07-10', version: 'v2.13', title: '全新配色:淡紫+鵝黃柔和撞色', desc: '整體換裝:背景淡紫 #EDE8F5、主色/按鈕紫 #6B5B95、點綴鵝黃 #F2E06B(備份提醒、部分繳納等)；收入綠/支出紅改為 #5B9279/#E07A5F 色系(文字用途加深以符合 WCAG AA 對比，黃底一律深字)。進度圈固定段改紫色、變動段綠→黃→紅;圓餅圖、線圖、App 圖示與 PWA 主題色同步換色。每日線圖下方提示改為多行，並量化顯示超前/落後等速參考的金額、超過整月變動預算時以紅字標示超標金額。' },
     { date: '2026-07-10', version: 'v2.12', title: '圖表移至損益表頁', desc: '「本月支出比例」圓餅與「每日累計花費」線圖從記帳頁移到損益表頁，記帳頁回歸輸入本位:快速記帳+預算進度圈+歷史紀錄;損益表頁成為完整的分析頁:每月損益表在最上方，當月圖表接續在下。' },
@@ -4222,6 +4577,7 @@
     wrap.innerHTML = `
       <div><div class="label">記帳紀錄</div><div class="value">${records.length} 筆</div></div>
       <div><div class="label">投資持股</div><div class="value">${investments.length} 檔</div></div>
+      <div><div class="label">投資快照</div><div class="value">${investmentSnapshots.length} 筆</div></div>
       <div><div class="label">持股截圖</div><div class="value">${screenshots.length} 張</div></div>
       <div><div class="label">自訂類別</div><div class="value">${catCount} 個</div></div>
       <div><div class="label">手動欠款</div><div class="value">${manualDebts.length} 筆</div></div>
@@ -4239,6 +4595,7 @@
       records,
       customCategories,
       investments,
+      investmentSnapshots,
       screenshots,
       categoryUsage,
       manualDebts,
@@ -4334,7 +4691,8 @@
     }
 
     let addedRecords = 0, addedInvestments = 0, addedScreenshots = 0, addedCategories = 0,
-        addedDebts = 0, addedBillTemplates = 0, addedBillInstances = 0, addedCategoryRules = 0;
+        addedDebts = 0, addedBillTemplates = 0, addedBillInstances = 0, addedCategoryRules = 0,
+        addedSnapshots = 0;
 
     if (Array.isArray(data.records)) {
       const existingIds = new Set(records.map(r => r.id));
@@ -4370,6 +4728,19 @@
           investments.push(i);
           existingIds.add(i.id);
           addedInvestments++;
+        }
+      });
+    }
+
+    // Snapshots are history: dedupe by id only, never overwrite an existing
+    // snapshot even if the imported one shares the same period.
+    if (Array.isArray(data.investmentSnapshots)) {
+      const existingIds = new Set(investmentSnapshots.map(s => s.id));
+      data.investmentSnapshots.forEach(s => {
+        if (s && s.id && !existingIds.has(s.id)) {
+          investmentSnapshots.push(s);
+          existingIds.add(s.id);
+          addedSnapshots++;
         }
       });
     }
@@ -4463,6 +4834,7 @@
     saveRecords();
     saveCustomCategories();
     saveInvestments();
+    saveInvestmentSnapshots();
     saveCategoryUsage();
     saveManualDebts();
     saveBillTemplates();
@@ -4480,7 +4852,7 @@
       localStorage.setItem(LAST_BACKUP_KEY, String(new Date(data.exportedAt).getTime()));
     }
 
-    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單、${addedCategoryRules} 條分類規則`);
+    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedSnapshots} 筆投資快照、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單、${addedCategoryRules} 條分類規則`);
 
     renderCategoryRulesList();
     renderCategoryGrid();
@@ -4500,6 +4872,7 @@
     records = [];
     customCategories = { expense: [], income: [] };
     investments = [];
+    investmentSnapshots = [];
     screenshots = [];
     categoryUsage = { expense: {}, income: {} };
     manualDebts = [];
@@ -4510,6 +4883,7 @@
     saveRecords();
     saveCustomCategories();
     saveInvestments();
+    saveInvestmentSnapshots();
     saveScreenshots();
     saveCategoryUsage();
     saveManualDebts();
