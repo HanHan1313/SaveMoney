@@ -2855,11 +2855,21 @@
   let splitTab = 'pending';
   const openPersonCards = new Set();
 
+  // Pagination (v2.16): "全部明細" and per-person detail lists use a
+  // "load more" reveal-count model rather than numbered pages, since a
+  // cumulative count naturally self-heals when items are removed (settling
+  // an item just shrinks the underlying array; slice(0, count) then shows
+  // one fewer row with no separate "go back a page" logic needed).
+  const SPLITS_PAGE_SIZE = 10;
+  let splitsVisibleCount = SPLITS_PAGE_SIZE;
+  const personDetailVisibleCounts = new Map(); // key: `${name}::${direction}` -> visible count
+
   document.querySelectorAll('#splitTabs button').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#splitTabs button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       splitTab = btn.dataset.tab;
+      splitsVisibleCount = SPLITS_PAGE_SIZE;
       renderSplitsOverview();
     });
   });
@@ -3018,6 +3028,9 @@
         } else {
           openPersonCards.add(agg.name);
           detailWrap.classList.add('open');
+          // Fresh open always starts at page 1 (10 items) for this person.
+          personDetailVisibleCounts.delete(`${agg.name}::receivable`);
+          personDetailVisibleCounts.delete(`${agg.name}::payable`);
           renderPersonDetail(detailWrap, agg.name, allItems);
         }
       });
@@ -3036,22 +3049,36 @@
       const pending = allItems.filter(it => it.name === name && it.direction === direction && it.status === 'pending');
       if (pending.length === 0) return;
 
+      const sorted = pending.slice().sort((a, b) => a.date.localeCompare(b.date));
+      const countKey = `${name}::${direction}`;
+      const visibleCount = personDetailVisibleCounts.get(countKey) || SPLITS_PAGE_SIZE;
+      const visible = sorted.slice(0, visibleCount);
+
       const groupTitle = document.createElement('div');
       groupTitle.className = 'person-detail-group-title';
       groupTitle.textContent = direction === 'receivable' ? '對方應付你' : '你應付對方';
       container.appendChild(groupTitle);
 
-      pending
-        .slice()
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .forEach(item => {
-          const row = document.createElement('div');
-          row.className = 'person-detail-item';
-          const remaining = remainingOf(item);
-          const paidNote = item.paidAmount > 0 ? `(已還${formatMoney(item.paidAmount)})` : '';
-          row.innerHTML = `<span>${item.date}・${escapeHtml(item.label)}${paidNote}</span><span style="font-weight:700;color:${direction === 'receivable' ? 'var(--income)' : 'var(--expense)'}">${formatMoney(remaining)}</span>`;
-          container.appendChild(row);
+      visible.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'person-detail-item';
+        const remaining = remainingOf(item);
+        const paidNote = item.paidAmount > 0 ? `(已還${formatMoney(item.paidAmount)})` : '';
+        row.innerHTML = `<span>${item.date}・${escapeHtml(item.label)}${paidNote}</span><span style="font-weight:700;color:${direction === 'receivable' ? 'var(--income)' : 'var(--expense)'}">${formatMoney(remaining)}</span>`;
+        container.appendChild(row);
+      });
+
+      if (sorted.length > visibleCount) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'bill-history-toggle';
+        moreBtn.textContent = `載入更多(還有 ${sorted.length - visibleCount} 筆)`;
+        moreBtn.addEventListener('click', () => {
+          personDetailVisibleCounts.set(countKey, visibleCount + SPLITS_PAGE_SIZE);
+          renderPersonDetail(container, name, allItems);
         });
+        container.appendChild(moreBtn);
+      }
 
       const totalRemaining = Math.round(pending.reduce((s, it) => s + remainingOf(it), 0) * 100) / 100;
 
@@ -3094,6 +3121,10 @@
 
   function settleAllForPerson(name, direction) {
     const items = collectLedgerItems().filter(it => it.name === name && it.direction === direction && it.status === 'pending');
+    if (items.length === 0) return;
+    const total = Math.round(items.reduce((s, it) => s + remainingOf(it), 0) * 100) / 100;
+    const dirLabel = direction === 'receivable' ? '對方應付你' : '你應付對方';
+    if (!confirm(`確定要將「${name}」${items.length} 筆${dirLabel}的款項(共 ${formatMoney(total)})全部標記為已結清嗎？`)) return;
     items.forEach(it => { applyRepayment(it, remainingOf(it)); });
     showToast('已全額結清');
     persistLedgerChanges();
@@ -3108,16 +3139,22 @@
 
     const wrap = el('splitsList');
     wrap.innerHTML = '';
-    const items = collectLedgerItems()
+    const allTabItems = collectLedgerItems()
       .filter(it => it.status === splitTab)
       .sort((a, b) => b.date.localeCompare(a.date));
 
-    if (items.length === 0) {
+    if (allTabItems.length === 0) {
       wrap.innerHTML = splitTab === 'pending'
         ? '<div class="empty-note">目前沒有待結清的分帳</div>'
         : '<div class="empty-note">目前沒有已結清的分帳</div>';
       return;
     }
+
+    // "load more" clamps itself naturally: if items shrink (e.g. an item got
+    // settled and dropped out of the 'pending' tab), slice(0, count) below
+    // just returns fewer rows next render — no separate "go back a page"
+    // bookkeeping is needed.
+    const items = allTabItems.slice(0, splitsVisibleCount);
 
     items.forEach(item => {
       const isPending = splitTab === 'pending';
@@ -3158,6 +3195,19 @@
 
       wrap.appendChild(el2);
     });
+
+    if (allTabItems.length > splitsVisibleCount) {
+      const moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'bill-history-toggle';
+      moreBtn.style.marginTop = '10px';
+      moreBtn.textContent = `載入更多(還有 ${allTabItems.length - splitsVisibleCount} 筆)`;
+      moreBtn.addEventListener('click', () => {
+        splitsVisibleCount += SPLITS_PAGE_SIZE;
+        renderSplitsOverview();
+      });
+      wrap.appendChild(moreBtn);
+    }
   }
 
   // ---------- Manual debts (功能 1C) ----------
@@ -4499,6 +4549,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-30', version: 'v2.16', title: '分帳總覽明細分頁', desc: '「全部明細」與展開的成員卡片明細改為每 10 筆一頁，底部提供「載入更多」(手機優先，較省空間)；切換待結/已結清分頁或重新展開成員卡片會重置回前 10 筆。標記已結清後名單自動變短，不會出現空白頁。頁籤上的「N 筆待結」徽章維持顯示總數，不受分頁影響。成員卡片新增「全部結清」時會先跳出確認提示再執行。' },
     { date: '2026-07-22', version: 'v2.15', title: '投資持股快照歷史與貼上更新', desc: '投資頁新增「貼上更新持股」:貼上券商表格文字(股名/股數/成本價[可省略]/現價，Tab 或多空白分隔)即可一次解析多檔，預覽標示新增/更新/無變動，貼上資料未包含的持股可選擇保留或視為已出清，取代逐筆手動修改。新增「儲存本月快照」:記錄當下總市值/總成本/報酬率與每檔明細，同月重複儲存以最新覆蓋。新增「資產變化」折線圖(總市值實線、總成本虛線疊加)與月度漲跌對比，未滿 2 筆快照顯示累積中；持股明細可展開單檔歷月市值。快照納入備份，以 id 去重不覆蓋既有快照。' },
     { date: '2026-07-11', version: 'v2.14', title: '應繳帳單支援年繳/季繳週期', desc: '帳單類型新增「繳費週期」:月繳(預設)/季繳/年繳；年繳、季繳需另填到期月份(1-12)，只有在到期月份才產生本期帳單，不再每月重複產生(如汽燃費 7 月、房屋稅 5 月)。年繳/季繳帳單繳費仍正常建立支出記錄，但不會自動被算進預算的「固定已花」(避免課稅月份固定支出假性暴衝，比照房屋稅原則歸入變動)。已有期別產生的帳單，繳費週期和金額類型一樣鎖定不可更改。帳單卡片新增週期標籤(月繳/季繳/年繳)。' },
     { date: '2026-07-10', version: 'v2.13', title: '全新配色:淡紫+鵝黃柔和撞色', desc: '整體換裝:背景淡紫 #EDE8F5、主色/按鈕紫 #6B5B95、點綴鵝黃 #F2E06B(備份提醒、部分繳納等)；收入綠/支出紅改為 #5B9279/#E07A5F 色系(文字用途加深以符合 WCAG AA 對比，黃底一律深字)。進度圈固定段改紫色、變動段綠→黃→紅;圓餅圖、線圖、App 圖示與 PWA 主題色同步換色。每日線圖下方提示改為多行，並量化顯示超前/落後等速參考的金額、超過整月變動預算時以紅字標示超標金額。' },
