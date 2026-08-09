@@ -385,11 +385,13 @@
 
   .filter-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 12px;
   }
   .filter-row select {
     flex: 1;
+    min-width: 96px;
     padding: 10px;
     font-size: 14px;
     border: 1px solid var(--border);
@@ -397,6 +399,17 @@
     background: var(--bg);
     color: var(--text);
   }
+  .history-subtotal {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--sub-text);
+    margin: -2px 0 12px;
+  }
+  .history-subtotal .inc { color: var(--income); font-weight: 700; }
+  .history-subtotal .exp { color: var(--expense); font-weight: 700; }
 
   /* ---- Report (P&L) ---- */
   .month-row {
@@ -1471,7 +1484,9 @@
           <option value="expense">支出</option>
         </select>
         <select id="filterMonth"></select>
+        <select id="filterCategory"></select>
       </div>
+      <div class="history-subtotal" id="historySubtotal"></div>
       <div id="historyList"></div>
       <div class="pagination" id="historyPagination"></div>
     </div>
@@ -2621,8 +2636,28 @@
     }
   }
 
-  el('filterType').addEventListener('change', () => { historyPage = 1; renderHistory(); });
+  // Category options are derived from records actually used under the current
+  // type filter (not from getCategories()), so the list never offers a
+  // category with zero matching history and always reflects real data —
+  // including categories later renamed/removed from the category grid.
+  function populateHistoryCategoryFilter() {
+    const select = el('filterCategory');
+    const typeFilter = el('filterType').value;
+    const relevant = typeFilter === 'all' ? records : records.filter(r => r.type === typeFilter);
+    const cats = Array.from(new Set(relevant.map(r => r.category))).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+    const currentVal = select.value;
+    select.innerHTML = '<option value="all">全部類別</option>' +
+      cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    select.value = cats.includes(currentVal) ? currentVal : 'all';
+  }
+
+  el('filterType').addEventListener('change', () => {
+    historyPage = 1;
+    populateHistoryCategoryFilter();
+    renderHistory();
+  });
   el('filterMonth').addEventListener('change', () => { historyPage = 1; renderHistory(); });
+  el('filterCategory').addEventListener('change', () => { historyPage = 1; renderHistory(); });
 
   // ---------- History List ----------
   function categoryIcon(type, cat) {
@@ -2655,11 +2690,26 @@
 
     const typeFilter = el('filterType').value;
     const monthFilter = el('filterMonth').value;
+    const categoryFilter = el('filterCategory').value;
 
     let filtered = records.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
 
     if (typeFilter !== 'all') filtered = filtered.filter(r => r.type === typeFilter);
     if (monthFilter !== 'all') filtered = filtered.filter(r => r.date.slice(0, 7) === monthFilter);
+    if (categoryFilter !== 'all') filtered = filtered.filter(r => r.category === categoryFilter);
+
+    // Subtotal reflects the whole filtered set, not just the current page.
+    const subtotalEl = el('historySubtotal');
+    if (filtered.length === 0) {
+      subtotalEl.innerHTML = '';
+    } else {
+      const incomeSum = Math.round(filtered.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0) * 100) / 100;
+      const expenseSum = Math.round(filtered.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0) * 100) / 100;
+      const parts = [];
+      if (typeFilter !== 'expense') parts.push(`<span>收入合計 <span class="inc">${formatMoney(incomeSum)}</span></span>`);
+      if (typeFilter !== 'income') parts.push(`<span>支出合計 <span class="exp">${formatMoney(expenseSum)}</span></span>`);
+      subtotalEl.innerHTML = `<span>共 ${filtered.length} 筆</span>` + parts.join('');
+    }
 
     if (filtered.length === 0) {
       const note = document.createElement('div');
@@ -3182,6 +3232,7 @@
   function renderLedger() {
     renderBudgetCard();
     populateMonthFilter();
+    populateHistoryCategoryFilter();
     renderHistory();
     renderSplitsOverview();
     refreshSplitNamesList();
@@ -4197,6 +4248,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-07-30', version: 'v2.18', title: '歷史紀錄新增類別篩選與小計', desc: '記帳頁「歷史紀錄」新增類別篩選(選單依目前的類型篩選動態列出實際有記錄的類別，切換收入/支出會自動改選項)，可與月份篩選並用，只看特定類別的特定月份。篩選結果上方新增小計列，顯示符合條件的總筆數與收入/支出合計金額(反映全部篩選結果，非只算當頁 20 筆)。' },
     { date: '2026-07-30', version: 'v2.17', title: '移除投資頁持股截圖功能', desc: '截圖上傳/OCR 辨識/縮圖牆與燈箱瀏覽已從投資頁移除，改由「貼上更新持股」+「儲存本月快照」取代(用途重疊但更準確、有歷史軌跡)。舊備份的 screenshots 欄位仍可正常匯入合併，只是不再有介面可上傳新截圖或瀏覽；如需保留既有截圖，先用「匯出並分享備份檔」留一份即可。' },
     { date: '2026-07-30', version: 'v2.16', title: '分帳總覽明細分頁', desc: '「全部明細」與展開的成員卡片明細改為每 10 筆一頁，底部提供「載入更多」(手機優先，較省空間)；切換待結/已結清分頁或重新展開成員卡片會重置回前 10 筆。標記已結清後名單自動變短，不會出現空白頁。頁籤上的「N 筆待結」徽章維持顯示總數，不受分頁影響。成員卡片新增「全部結清」時會先跳出確認提示再執行。' },
     { date: '2026-07-22', version: 'v2.15', title: '投資持股快照歷史與貼上更新', desc: '投資頁新增「貼上更新持股」:貼上券商表格文字(股名/股數/成本價[可省略]/現價，Tab 或多空白分隔)即可一次解析多檔，預覽標示新增/更新/無變動，貼上資料未包含的持股可選擇保留或視為已出清，取代逐筆手動修改。新增「儲存本月快照」:記錄當下總市值/總成本/報酬率與每檔明細，同月重複儲存以最新覆蓋。新增「資產變化」折線圖(總市值實線、總成本虛線疊加)與月度漲跌對比，未滿 2 筆快照顯示累積中；持股明細可展開單檔歷月市值。快照納入備份，以 id 去重不覆蓋既有快照。' },
