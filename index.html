@@ -315,6 +315,27 @@
   .legend-name { flex: 1; }
   .legend-percent { color: var(--sub-text); margin-right: 8px; }
   .legend-amount { font-weight: 600; }
+
+  /* ---- Category monthly trend chart ---- */
+  .trend-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: 10px;
+    justify-content: center;
+  }
+  .trend-legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .trend-legend-item .legend-dot { margin-right: 6px; }
+  .trend-legend-amt {
+    margin-left: 6px;
+    font-weight: 600;
+    color: var(--sub-text);
+  }
   .empty-note {
     text-align: center;
     color: var(--sub-text);
@@ -1508,6 +1529,12 @@
       </div>
     </div>
 
+    <!-- Top-5 category monthly trend -->
+    <div class="card">
+      <h2>五大類別月度趨勢</h2>
+      <div id="categoryTrendChartWrap"></div>
+    </div>
+
     <!-- Daily cumulative spending chart (current month) -->
     <div class="card">
       <h2>每日累計花費(變動支出)</h2>
@@ -2622,6 +2649,139 @@
     ctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
+  }
+
+  // ---------- Top-5 category monthly trend (line chart, last up to 6 months) ----------
+  // Catmull-Rom -> cubic Bezier smoothing, so multi-series trend lines read
+  // as gentle curves instead of sharp zig-zags (matches the app's rounded
+  // visual language better than straight polylines).
+  function smoothPath(points) {
+    if (points.length < 2) return '';
+    if (points.length === 2) return `M ${points[0][0].toFixed(1)},${points[0][1].toFixed(1)} L ${points[1][0].toFixed(1)},${points[1][1].toFixed(1)}`;
+    let d = `M ${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+      const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
+
+  function formatCompactAmount(v) {
+    if (Math.abs(v) >= 1000) {
+      const k = v / 1000;
+      return (Number.isInteger(k) ? k : k.toFixed(1)) + 'k';
+    }
+    return String(Math.round(v));
+  }
+
+  // Nudges vertically-clustered end labels apart (keeping their relative
+  // order) so two categories that end the period close in value don't render
+  // on top of each other.
+  function spreadLabelsApart(items, minGap) {
+    const sorted = items.slice().sort((a, b) => a.y - b.y);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].y - sorted[i - 1].y < minGap) sorted[i].y = sorted[i - 1].y + minGap;
+    }
+    return sorted;
+  }
+
+  function renderCategoryTrendChart() {
+    const wrap = el('categoryTrendChartWrap');
+    if (!wrap) return;
+
+    const monthsWithExpense = Array.from(new Set(records.filter(r => r.type === 'expense').map(r => r.date.slice(0, 7)))).sort();
+    const months = monthsWithExpense.slice(-6);
+
+    if (months.length < 2) {
+      wrap.innerHTML = '<div class="empty-note">資料不足，月份增加後可看到類別趨勢</div>';
+      return;
+    }
+
+    const monthSet = new Set(months);
+    const categoryTotals = {};
+    records.forEach(r => {
+      if (r.type !== 'expense' || !monthSet.has(r.date.slice(0, 7))) return;
+      categoryTotals[r.category] = (categoryTotals[r.category] || 0) + r.amount;
+    });
+    const topCategories = Object.entries(categoryTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([cat]) => cat);
+
+    const series = topCategories.map(cat => ({
+      category: cat,
+      values: months.map(m => Math.round(
+        records
+          .filter(r => r.type === 'expense' && r.category === cat && r.date.slice(0, 7) === m)
+          .reduce((s, r) => s + r.amount, 0) * 100
+      ) / 100)
+    }));
+
+    const W = 320, H = 200, padL = 42, padR = 32, padT = 14, padB = 24;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const maxY = Math.max(...series.flatMap(s => s.values), 1) * 1.08;
+    const n = months.length;
+    const x = i => padL + (n === 1 ? 0 : (i / (n - 1)) * plotW);
+    const y = v => padT + plotH - (v / maxY) * plotH;
+
+    // Gridlines + Y-axis amount ticks (4 evenly spaced levels).
+    const TICKS = 4;
+    let gridHtml = '';
+    for (let t = 0; t <= TICKS; t++) {
+      const val = maxY * (t / TICKS);
+      const yy = y(val).toFixed(1);
+      gridHtml += `<line x1="${padL}" y1="${yy}" x2="${(W - padR).toFixed(1)}" y2="${yy}" stroke="var(--border)" stroke-width="1"/>`;
+      gridHtml += `<text x="${padL - 6}" y="${(y(val) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#8e8e93">${formatCompactAmount(val)}</text>`;
+    }
+
+    const monthTicks = months.map((m, i) => {
+      const short = m.slice(5, 7) + '月';
+      const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
+      return `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="${anchor}" font-size="10" fill="#8e8e93">${short}</text>`;
+    }).join('');
+
+    const lines = series.map((s, idx) => {
+      const color = CHART_COLORS[idx % CHART_COLORS.length];
+      const points = s.values.map((v, i) => [x(i), y(v)]);
+      const dots = points.map(([px, py]) => `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${color}"/>`).join('');
+      return `<path d="${smoothPath(points)}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+    }).join('');
+
+    // End-of-line value labels, spread apart so close-value categories don't overlap.
+    const endLabels = spreadLabelsApart(
+      series.map((s, idx) => ({
+        y: y(s.values[s.values.length - 1]),
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+        text: formatCompactAmount(s.values[s.values.length - 1])
+      })),
+      11
+    );
+    const endLabelsHtml = endLabels.map(l =>
+      `<text x="${(x(n - 1) + 6).toFixed(1)}" y="${(l.y + 3).toFixed(1)}" font-size="10" font-weight="700" fill="${l.color}">${l.text}</text>`
+    ).join('');
+
+    const legendHtml = series.map((s, idx) => {
+      const color = CHART_COLORS[idx % CHART_COLORS.length];
+      const latest = s.values[s.values.length - 1];
+      return `<div class="trend-legend-item"><span class="legend-dot" style="background:${color}"></span>${escapeHtml(s.category)}<span class="trend-legend-amt">${formatMoney(latest)}</span></div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        ${gridHtml}
+        ${lines}
+        ${monthTicks}
+        ${endLabelsHtml}
+      </svg>
+      <div class="trend-legend">${legendHtml}</div>
+    `;
   }
 
   // ---------- Filters ----------
@@ -3806,6 +3966,7 @@
   // ================= REPORT (Monthly P&L) =================
   function renderReport() {
     renderChart();
+    renderCategoryTrendChart();
     renderDailyChart();
     const list = el('reportList');
     list.innerHTML = '';
@@ -4248,6 +4409,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-08-09', version: 'v2.19', title: '損益表頁新增五大類別月度趨勢', desc: '損益表頁新增折線圖，取最近有支出紀錄的月份(最多 6 個月)，畫出金額最高的前 5 大支出類別逐月變化，一眼看出哪個月餐飲/娛樂特別高。曲線平滑化、加上 Y 軸金額格線刻度，每條線尾端直接標示最新金額(數值相近時自動錯開避免重疊)，下方圖例同步列出顏色與金額。資料不足 2 個月時顯示提示文字，不畫空圖。' },
     { date: '2026-07-30', version: 'v2.18', title: '歷史紀錄新增類別篩選與小計', desc: '記帳頁「歷史紀錄」新增類別篩選(選單依目前的類型篩選動態列出實際有記錄的類別，切換收入/支出會自動改選項)，可與月份篩選並用，只看特定類別的特定月份。篩選結果上方新增小計列，顯示符合條件的總筆數與收入/支出合計金額(反映全部篩選結果，非只算當頁 20 筆)。' },
     { date: '2026-07-30', version: 'v2.17', title: '移除投資頁持股截圖功能', desc: '截圖上傳/OCR 辨識/縮圖牆與燈箱瀏覽已從投資頁移除，改由「貼上更新持股」+「儲存本月快照」取代(用途重疊但更準確、有歷史軌跡)。舊備份的 screenshots 欄位仍可正常匯入合併，只是不再有介面可上傳新截圖或瀏覽；如需保留既有截圖，先用「匯出並分享備份檔」留一份即可。' },
     { date: '2026-07-30', version: 'v2.16', title: '分帳總覽明細分頁', desc: '「全部明細」與展開的成員卡片明細改為每 10 筆一頁，底部提供「載入更多」(手機優先，較省空間)；切換待結/已結清分頁或重新展開成員卡片會重置回前 10 筆。標記已結清後名單自動變短，不會出現空白頁。頁籤上的「N 筆待結」徽章維持顯示總數，不受分頁影響。成員卡片新增「全部結清」時會先跳出確認提示再執行。' },
