@@ -644,6 +644,88 @@
   }
   .holding-history-item:last-child { border-bottom: none; }
 
+  /* ---- Net worth (資產頁) ---- */
+  .networth-hero {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-top: 4px;
+  }
+  .networth-breakdown {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .networth-breakdown div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--sub-text);
+    padding: 4px 0;
+  }
+  .networth-breakdown .networth-stale-note {
+    display: block;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #6B5D1A;
+    background: #FBF5D8;
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+  .account-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .account-row input {
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    min-width: 0;
+  }
+  .account-row .acc-name { flex: 1.3; }
+  .account-row .acc-balance { flex: 1; }
+  .account-row .acc-del {
+    border: none;
+    background: none;
+    color: var(--expense);
+    font-size: 16px;
+    padding: 4px 6px;
+    flex-shrink: 0;
+  }
+  .reconcile-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    padding: 6px 0;
+  }
+  .reconcile-status {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 12px;
+  }
+  .reconcile-status.ok { background: rgba(91,146,121,0.15); color: var(--income); }
+  .reconcile-status.warn { background: rgba(224,122,95,0.15); color: var(--expense); }
+  .reconcile-hint {
+    font-size: 12px;
+    color: var(--sub-text);
+    line-height: 1.6;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 12px;
+  }
+  .reconcile-badge { font-size: 12px; margin-left: 4px; }
+
   /* ---- CSV import preview ---- */
   .csv-row-wrap {
     border-bottom: 1px solid var(--border);
@@ -1610,6 +1692,40 @@
     </div>
   </div>
 
+  <!-- ============ PAGE: NET WORTH ============ -->
+  <div class="page" id="page-networth">
+    <div class="card" id="networthIntroCard" style="display:none;">
+      <div class="settings-desc">每月固定記錄一次各帳戶餘額,系統會自動比對「淨資產實際增加」與「記帳算出的結餘」。兩者接近代表記帳完整;差距大則可能有漏記,而且範圍只有一個月、容易回頭查。建立前請先更新投資持股現價。</div>
+    </div>
+
+    <div class="card">
+      <div class="month-label" id="netWorthLabel">最新淨資產</div>
+      <div class="networth-hero" id="netWorthValue">尚未建立快照</div>
+      <div class="networth-breakdown" id="netWorthBreakdown"></div>
+      <div id="netWorthChange"></div>
+    </div>
+
+    <div class="card">
+      <button type="button" class="submit-btn" id="createSnapshotBtn">📌 建立本月快照</button>
+      <div id="snapshotForm" style="display:none; margin-top:14px;"></div>
+    </div>
+
+    <div class="card" id="reconcileCard" style="display:none;">
+      <h2>對帳驗證</h2>
+      <div id="reconcileBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>淨資產趨勢</h2>
+      <div id="netWorthChartWrap"></div>
+    </div>
+
+    <div class="card">
+      <h2>歷史快照</h2>
+      <div id="netWorthHistoryList"></div>
+    </div>
+  </div>
+
   <!-- ============ PAGE: BILLS ============ -->
   <div class="page" id="page-bills">
     <div class="card">
@@ -1852,6 +1968,7 @@
   <button class="nav-btn active" data-page="ledger">📒<span>記帳</span></button>
   <button class="nav-btn" data-page="report">📊<span>損益表</span></button>
   <button class="nav-btn" data-page="investment">📈<span>投資</span></button>
+  <button class="nav-btn" data-page="networth">🏦<span>資產</span></button>
   <button class="nav-btn" data-page="bills">📄<span>帳單</span></button>
   <button class="nav-btn" data-page="settings">⚙️<span>設定</span></button>
 </nav>
@@ -1876,6 +1993,8 @@
   const BILL_INSTANCES_KEY = 'expenseTrackerBillInstances';
   const CATEGORY_RULES_KEY = 'expenseTrackerCategoryRules';
   const BUDGET_KEY = 'expenseTrackerBudget';
+  const NETWORTH_KEY = 'expenseTrackerNetWorthSnapshots';
+  const ACCOUNT_LIST_KEY = 'expenseTrackerAccountList';
 
   const DEFAULT_CATEGORIES = {
     expense: [
@@ -1910,6 +2029,8 @@
   let billInstances = loadJSON(BILL_INSTANCES_KEY, []);
   let categoryRules = loadJSON(CATEGORY_RULES_KEY, { expense: {}, income: {} });
   let budget = loadJSON(BUDGET_KEY, null);
+  let netWorthSnapshots = loadJSON(NETWORTH_KEY, []);
+  let accountList = loadJSON(ACCOUNT_LIST_KEY, []);
   let currentType = 'expense';
   let currentCategory = null;
   let splitDirection = 'receivable';
@@ -1944,6 +2065,8 @@
   function saveBillInstances() { save(BILL_INSTANCES_KEY, billInstances); }
   function saveCategoryRules() { save(CATEGORY_RULES_KEY, categoryRules); }
   function saveBudget() { budget.updatedAt = todayStr(); save(BUDGET_KEY, budget); }
+  function saveNetWorthSnapshots() { save(NETWORTH_KEY, netWorthSnapshots); }
+  function saveAccountList() { save(ACCOUNT_LIST_KEY, accountList); }
 
   function defaultBudget() {
     return {
@@ -2098,6 +2221,7 @@
       if (btn.dataset.page === 'investment') renderInvestments();
       if (btn.dataset.page === 'settings') renderSettingsSummary();
       if (btn.dataset.page === 'bills') renderBillsPage();
+      if (btn.dataset.page === 'networth') renderNetWorthPage();
     });
   });
 
@@ -4409,6 +4533,7 @@
 
   // Add a new entry to the TOP of this list every time a future update ships.
   const CHANGELOG = [
+    { date: '2026-09-19', version: 'v2.20', title: '新增「資產」頁:淨資產快照與對帳驗證', desc: '新增獨立「資產」頁籤。每月手動記一次各帳戶餘額(帳戶清單建一次記住，之後只需更新數字)，投資市值/分帳應收淨額/未繳帳單自動帶入(可覆寫)，算出淨資產。從第二筆快照起自動對帳:比較「淨資產實際變動」與「記帳算出的帳面結餘」，差距在 5% 內顯示✅記帳完整，超出則提示可能有漏記的支出或收入，並列出常見原因(忘記更新持股現價、現金消費未記帳等)。持股超過 7 天未更新會提醒先更新再建快照。新增淨資產趨勢折線圖與可展開明細的歷史快照列表。快照與帳戶清單納入備份，以 id/名稱去重。' },
     { date: '2026-08-09', version: 'v2.19', title: '損益表頁新增五大類別月度趨勢', desc: '損益表頁新增折線圖，取最近有支出紀錄的月份(最多 6 個月)，畫出金額最高的前 5 大支出類別逐月變化，一眼看出哪個月餐飲/娛樂特別高。曲線平滑化、加上 Y 軸金額格線刻度，每條線尾端直接標示最新金額(數值相近時自動錯開避免重疊)，下方圖例同步列出顏色與金額。資料不足 2 個月時顯示提示文字，不畫空圖。' },
     { date: '2026-07-30', version: 'v2.18', title: '歷史紀錄新增類別篩選與小計', desc: '記帳頁「歷史紀錄」新增類別篩選(選單依目前的類型篩選動態列出實際有記錄的類別，切換收入/支出會自動改選項)，可與月份篩選並用，只看特定類別的特定月份。篩選結果上方新增小計列，顯示符合條件的總筆數與收入/支出合計金額(反映全部篩選結果，非只算當頁 20 筆)。' },
     { date: '2026-07-30', version: 'v2.17', title: '移除投資頁持股截圖功能', desc: '截圖上傳/OCR 辨識/縮圖牆與燈箱瀏覽已從投資頁移除，改由「貼上更新持股」+「儲存本月快照」取代(用途重疊但更準確、有歷史軌跡)。舊備份的 screenshots 欄位仍可正常匯入合併，只是不再有介面可上傳新截圖或瀏覽；如需保留既有截圖，先用「匯出並分享備份檔」留一份即可。' },
@@ -4492,6 +4617,7 @@
       <div><div class="label">記帳紀錄</div><div class="value">${records.length} 筆</div></div>
       <div><div class="label">投資持股</div><div class="value">${investments.length} 檔</div></div>
       <div><div class="label">投資快照</div><div class="value">${investmentSnapshots.length} 筆</div></div>
+      <div><div class="label">淨資產快照</div><div class="value">${netWorthSnapshots.length} 筆</div></div>
       <div><div class="label">持股截圖</div><div class="value">${screenshots.length} 張</div></div>
       <div><div class="label">自訂類別</div><div class="value">${catCount} 個</div></div>
       <div><div class="label">手動欠款</div><div class="value">${manualDebts.length} 筆</div></div>
@@ -4516,7 +4642,9 @@
       billTemplates,
       billInstances,
       categoryRules,
-      budget: Object.assign({}, budget, { fixedBudget: budgetFixedTotal() })
+      budget: Object.assign({}, budget, { fixedBudget: budgetFixedTotal() }),
+      netWorthSnapshots,
+      accountList
     };
   }
 
@@ -4606,7 +4734,7 @@
 
     let addedRecords = 0, addedInvestments = 0, addedScreenshots = 0, addedCategories = 0,
         addedDebts = 0, addedBillTemplates = 0, addedBillInstances = 0, addedCategoryRules = 0,
-        addedSnapshots = 0;
+        addedSnapshots = 0, addedNetWorthSnapshots = 0, addedAccounts = 0;
 
     if (Array.isArray(data.records)) {
       const existingIds = new Set(records.map(r => r.id));
@@ -4729,6 +4857,30 @@
       });
     }
 
+    // Net worth snapshots are history like investment snapshots: dedupe by id
+    // only, never overwrite an existing snapshot even if same period.
+    if (Array.isArray(data.netWorthSnapshots)) {
+      const existingIds = new Set(netWorthSnapshots.map(s => s.id));
+      data.netWorthSnapshots.forEach(s => {
+        if (s && s.id && !existingIds.has(s.id)) {
+          netWorthSnapshots.push(s);
+          existingIds.add(s.id);
+          addedNetWorthSnapshots++;
+        }
+      });
+    }
+
+    if (Array.isArray(data.accountList)) {
+      const existingNames = new Set(accountList.map(a => a.name));
+      data.accountList.forEach(a => {
+        if (a && a.name && !existingNames.has(a.name)) {
+          accountList.push({ id: a.id || genId(), name: a.name });
+          existingNames.add(a.name);
+          addedAccounts++;
+        }
+      });
+    }
+
     // Budget is a single settings object rather than a list: newer updatedAt
     // wins; backups without a budget field (v3 and earlier) leave local as-is.
     if (data.budget && typeof data.budget === 'object' && !Array.isArray(data.budget)) {
@@ -4754,6 +4906,8 @@
     saveBillTemplates();
     saveBillInstances();
     saveCategoryRules();
+    saveNetWorthSnapshots();
+    saveAccountList();
     try {
       saveScreenshots();
     } catch (err) {
@@ -4766,7 +4920,7 @@
       localStorage.setItem(LAST_BACKUP_KEY, String(new Date(data.exportedAt).getTime()));
     }
 
-    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedSnapshots} 筆投資快照、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單、${addedCategoryRules} 條分類規則`);
+    alert(`合併完成：新增 ${addedRecords} 筆記帳紀錄、${addedInvestments} 檔持股、${addedSnapshots} 筆投資快照、${addedScreenshots} 張截圖、${addedCategories} 個自訂類別、${addedDebts} 筆手動欠款、${addedBillTemplates} 個帳單類型、${addedBillInstances} 期帳單、${addedCategoryRules} 條分類規則、${addedNetWorthSnapshots} 筆淨資產快照、${addedAccounts} 個帳戶`);
 
     renderCategoryRulesList();
     renderCategoryGrid();
@@ -4775,6 +4929,7 @@
     renderSettingsSummary();
     generateBillInstancesIfNeeded();
     renderBillsPage();
+    renderNetWorthPage();
     checkBillsReminder();
     checkBackupReminder();
   }
@@ -4794,6 +4949,8 @@
     billInstances = [];
     categoryRules = { expense: {}, income: {} };
     budget = defaultBudget();
+    netWorthSnapshots = [];
+    accountList = [];
     saveRecords();
     saveCustomCategories();
     saveInvestments();
@@ -4805,12 +4962,15 @@
     saveBillInstances();
     saveCategoryRules();
     save(BUDGET_KEY, budget);
+    saveNetWorthSnapshots();
+    saveAccountList();
 
     renderCategoryGrid();
     renderLedger();
     renderInvestments();
     renderSettingsSummary();
     renderBillsPage();
+    renderNetWorthPage();
     checkBillsReminder();
     renderCategoryRulesList();
   });
@@ -5390,6 +5550,401 @@
 
     formWrap.style.display = 'block';
   });
+
+  // ================= NET WORTH (v2.20) =================
+  function computeReceivableNetTotal() {
+    return Math.round(getPersonAggregates().reduce((s, a) => s + a.net, 0) * 100) / 100;
+  }
+
+  // Only non-closed bill instances count: a closed instance's shortfall has
+  // already been rolled into the next instance's carriedOver, so summing
+  // both would double-count the same outstanding amount.
+  function computeUnpaidBillsTotal() {
+    return Math.round(
+      billInstances
+        .filter(inst => !inst.closed && inst.status !== 'paid')
+        .reduce((s, inst) => s + billRemaining(inst), 0) * 100
+    ) / 100;
+  }
+
+  function isInvestmentPricingStale() {
+    if (investments.length === 0) return false;
+    if (investmentSnapshots.length === 0) return true;
+    const latest = investmentSnapshots.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+    const days = (new Date(todayStr()) - new Date(latest.date)) / (1000 * 60 * 60 * 24);
+    return days > 7;
+  }
+
+  function latestNetWorthSnapshots() {
+    return netWorthSnapshots.slice().sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  function saveNetWorthSnapshot(data) {
+    const period = todayStr().slice(0, 7);
+    const existingIdx = netWorthSnapshots.findIndex(s => s.period === period);
+    const snap = {
+      id: existingIdx >= 0 ? netWorthSnapshots[existingIdx].id : genId(),
+      date: todayStr(),
+      period,
+      accounts: data.accounts,
+      cashTotal: data.cashTotal,
+      investmentValue: data.investmentValue,
+      receivable: data.receivable,
+      unpaidBills: data.unpaidBills,
+      netWorth: data.netWorth,
+      note: data.note || undefined
+    };
+    if (existingIdx >= 0) netWorthSnapshots[existingIdx] = snap;
+    else netWorthSnapshots.push(snap);
+    saveNetWorthSnapshots();
+    showToast(existingIdx >= 0 ? `已更新本月(${period})快照` : `已儲存本月(${period})快照`);
+    renderNetWorthPage();
+  }
+
+  function computeReconciliation(prevSnap, curSnap) {
+    const A = Math.round((curSnap.netWorth - prevSnap.netWorth) * 100) / 100;
+    // Period is strictly after the previous snapshot's date, up to and
+    // including the current snapshot's date — matches the P&L's own
+    // aggregation (r.amount already reflects myShare; bill payments only
+    // create a record when createExpenseRecord is set), so B lines up with
+    // what the 損益表 page would show for the same window.
+    const periodRecords = records.filter(r => r.date > prevSnap.date && r.date <= curSnap.date);
+    const income = periodRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const expense = periodRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const B = Math.round((income - expense) * 100) / 100;
+    const C = Math.round((A - B) * 100) / 100;
+    return { A, B, C };
+  }
+
+  function renderNetWorthHero() {
+    const valueEl = el('netWorthValue');
+    if (!valueEl) return;
+    const breakdownEl = el('netWorthBreakdown');
+    const changeEl = el('netWorthChange');
+    const snaps = latestNetWorthSnapshots();
+
+    const labelEl = el('netWorthLabel');
+
+    if (snaps.length === 0) {
+      labelEl.textContent = '最新淨資產';
+      valueEl.textContent = '尚未建立快照';
+      valueEl.style.fontSize = '18px';
+      breakdownEl.innerHTML = '';
+      changeEl.innerHTML = '';
+      return;
+    }
+
+    valueEl.style.fontSize = '';
+    const latest = snaps[snaps.length - 1];
+    // This card shows the latest *snapshot*, not live data — say so, and flag
+    // it when that snapshot isn't from the current month, so a stale number
+    // isn't mistaken for a calculation error.
+    const isCurrentMonth = latest.period === todayStr().slice(0, 7);
+    labelEl.textContent = `最新淨資產(${latest.date} 快照)`;
+    valueEl.textContent = formatMoney(latest.netWorth);
+    breakdownEl.innerHTML = (isCurrentMonth ? '' : `<div class="networth-stale-note">⚠️ 這是 ${latest.period} 的快照，本月尚未建立;下方數字是當時的值，不是即時資料</div>`) + `
+      <div><span>活存小計</span><span>${formatMoney(latest.cashTotal)}</span></div>
+      <div><span>投資市值</span><span>${formatMoney(latest.investmentValue)}</span></div>
+      <div><span>應收淨額</span><span style="color:${latest.receivable >= 0 ? 'var(--income)' : 'var(--expense)'}">${latest.receivable >= 0 ? '' : '-'}${formatMoney(Math.abs(latest.receivable))}</span></div>
+      <div><span>未繳帳單</span><span style="color:var(--expense)">${latest.unpaidBills > 0 ? '-' + formatMoney(latest.unpaidBills) : formatMoney(0)}</span></div>
+    `;
+
+    if (snaps.length >= 2) {
+      const prev = snaps[snaps.length - 2];
+      const diff = Math.round((latest.netWorth - prev.netWorth) * 100) / 100;
+      const pct = prev.netWorth !== 0 ? (diff / Math.abs(prev.netWorth)) * 100 : 0;
+      const up = diff >= 0;
+      changeEl.className = `invest-compare ${up ? 'up' : 'down'}`;
+      changeEl.textContent = `較上月 ${up ? '+' : ''}${formatMoney(diff)} (${up ? '+' : ''}${pct.toFixed(1)}%)`;
+    } else {
+      changeEl.className = '';
+      changeEl.innerHTML = '';
+    }
+  }
+
+  function renderReconciliation() {
+    const card = el('reconcileCard');
+    if (!card) return;
+    const snaps = latestNetWorthSnapshots();
+    if (snaps.length < 2) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+
+    const cur = snaps[snaps.length - 1];
+    const prev = snaps[snaps.length - 2];
+    const { A, B, C } = computeReconciliation(prev, cur);
+    const threshold = Math.abs(B) * 0.05;
+
+    let statusHtml;
+    if (Math.abs(C) <= threshold) {
+      statusHtml = `<div class="reconcile-status ok">✅ 記帳完整，帳實相符</div>`;
+    } else if (C < 0) {
+      statusHtml = `<div class="reconcile-status warn">⚠️ 可能有漏記的支出，或有未記錄的資金流出</div>`;
+    } else {
+      statusHtml = `<div class="reconcile-status warn">⚠️ 可能有漏記的收入</div>`;
+    }
+
+    el('reconcileBody').innerHTML = `
+      <div class="reconcile-row"><span>淨資產實際變動 A</span><span style="font-weight:700;color:${A >= 0 ? 'var(--income)' : 'var(--expense)'}">${A >= 0 ? '+' : ''}${formatMoney(A)}</span></div>
+      <div class="reconcile-row"><span>帳面結餘 B</span><span style="font-weight:700;color:${B >= 0 ? 'var(--income)' : 'var(--expense)'}">${B >= 0 ? '+' : ''}${formatMoney(B)}</span></div>
+      <div class="reconcile-row"><span>差異 C = A − B</span><span style="font-weight:700;">${C >= 0 ? '+' : ''}${formatMoney(C)}</span></div>
+      ${statusHtml}
+      <div class="reconcile-hint">常見原因:投資買賣後忘記更新持股現價、現金消費未記帳、借出/償還他人款項未記入分帳、帳戶餘額填寫日期與快照日不一致。</div>
+    `;
+  }
+
+  function renderNetWorthTrendChart() {
+    const wrap = el('netWorthChartWrap');
+    if (!wrap) return;
+    const snaps = latestNetWorthSnapshots();
+
+    if (snaps.length < 2) {
+      wrap.innerHTML = '<div class="empty-note">持續累積中，下月即可看到變化</div>';
+      return;
+    }
+
+    const W = 320, H = 200, padL = 46, padR = 34, padT = 14, padB = 24;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const values = snaps.map(s => s.netWorth);
+    const minV = Math.min(...values, 0);
+    const maxV = Math.max(...values, 1) * 1.08;
+    const n = snaps.length;
+    const x = i => padL + (n === 1 ? 0 : (i / (n - 1)) * plotW);
+    const y = v => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
+
+    const TICKS = 4;
+    let gridHtml = '';
+    for (let t = 0; t <= TICKS; t++) {
+      const val = minV + (maxV - minV) * (t / TICKS);
+      const yy = y(val).toFixed(1);
+      gridHtml += `<line x1="${padL}" y1="${yy}" x2="${(W - padR).toFixed(1)}" y2="${yy}" stroke="var(--border)" stroke-width="1"/>`;
+      gridHtml += `<text x="${padL - 6}" y="${(y(val) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#8e8e93">${formatCompactAmount(val)}</text>`;
+    }
+
+    const monthTicks = snaps.map((s, i) => {
+      const short = s.period.slice(5, 7) + '月';
+      const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
+      return `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="${anchor}" font-size="10" fill="#8e8e93">${short}</text>`;
+    }).join('');
+
+    const points = values.map((v, i) => [x(i), y(v)]);
+    const dots = points.map(([px, py]) => `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join('');
+    const last = points[points.length - 1];
+
+    wrap.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        ${gridHtml}
+        <path d="${smoothPath(points)}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}
+        ${monthTicks}
+        <text x="${(last[0] + 6).toFixed(1)}" y="${(last[1] + 3).toFixed(1)}" font-size="10" font-weight="700" fill="var(--accent)">${formatMoney(values[values.length - 1])}</text>
+      </svg>
+    `;
+  }
+
+  function renderNetWorthHistoryList() {
+    const wrap = el('netWorthHistoryList');
+    if (!wrap) return;
+    const snapsDesc = netWorthSnapshots.slice().sort((a, b) => b.period.localeCompare(a.period));
+
+    if (snapsDesc.length === 0) {
+      wrap.innerHTML = '<div class="empty-note">尚無歷史快照</div>';
+      return;
+    }
+
+    wrap.innerHTML = '';
+    snapsDesc.forEach((s, idx) => {
+      const prev = snapsDesc[idx + 1]; // older snapshot (desc-sorted, so "next" = previous period)
+      let diffHtml = '';
+      let badgeHtml = '';
+      if (prev) {
+        const diff = Math.round((s.netWorth - prev.netWorth) * 100) / 100;
+        const up = diff >= 0;
+        diffHtml = ` <span style="color:${up ? 'var(--income)' : 'var(--expense)'}">${up ? '+' : ''}${formatMoney(diff)}</span>`;
+        const { B, C } = computeReconciliation(prev, s);
+        const ok = Math.abs(C) <= Math.abs(B) * 0.05;
+        badgeHtml = `<span class="reconcile-badge">${ok ? '✅' : '⚠️'}</span>`;
+      }
+
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.style.cursor = 'pointer';
+      item.innerHTML = `
+        <div class="history-info">
+          <div class="history-category">${s.period} ${badgeHtml}</div>
+          <div class="history-date">${formatMoney(s.netWorth)}${diffHtml}</div>
+        </div>
+      `;
+
+      const detail = document.createElement('div');
+      detail.className = 'holding-history-list';
+      item.addEventListener('click', () => {
+        detail.classList.toggle('open');
+        if (!detail.classList.contains('open')) return;
+        const accountRows = (s.accounts || []).map(a => `<div class="holding-history-item"><span>${escapeHtml(a.name)}</span><span>${formatMoney(a.balance)}</span></div>`).join('');
+        detail.innerHTML = accountRows +
+          `<div class="holding-history-item"><span>投資市值</span><span>${formatMoney(s.investmentValue)}</span></div>` +
+          `<div class="holding-history-item"><span>應收淨額</span><span>${formatMoney(s.receivable)}</span></div>` +
+          `<div class="holding-history-item"><span>未繳帳單</span><span>${formatMoney(s.unpaidBills)}</span></div>` +
+          (s.note ? `<div class="history-note">${escapeHtml(s.note)}</div>` : '');
+      });
+
+      wrap.appendChild(item);
+      wrap.appendChild(detail);
+    });
+  }
+
+  function computeCashTotalFromRows(container) {
+    let sum = 0;
+    container.querySelectorAll('.acc-balance').forEach(inp => {
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) sum += v;
+    });
+    return Math.round(sum * 100) / 100;
+  }
+
+  function buildNetWorthSnapshotForm() {
+    const formWrap = el('snapshotForm');
+    const lastSnap = latestNetWorthSnapshots().slice(-1)[0];
+    const lastBalanceByName = {};
+    if (lastSnap) (lastSnap.accounts || []).forEach(a => { lastBalanceByName[a.name] = a.balance; });
+
+    const staleWarning = isInvestmentPricingStale()
+      ? `<div class="bill-carry-warning">⚠️ 持股現價可能過舊(超過 7 天未更新)，建議先到投資頁更新現價、存一次投資快照，再回來建立本月資產快照</div>`
+      : '';
+
+    const autoInvestValue = Math.round(investStats().totalValue * 100) / 100;
+    const autoReceivable = computeReceivableNetTotal();
+    const autoUnpaidBills = computeUnpaidBillsTotal();
+
+    formWrap.innerHTML = `
+      ${staleWarning}
+      <div class="field">
+        <label>各帳戶餘額</label>
+        <div id="snapshotAccountRows"></div>
+        <button type="button" class="submit-btn btn-outline" id="addAccountRowBtn" style="margin-top:4px;">+ 新增帳戶</button>
+      </div>
+      <div class="budget-fixed-total">活存小計:<span id="snapshotCashTotal">$0</span></div>
+      <div class="field">
+        <label>投資市值(自動帶入，可覆寫)</label>
+        <input type="number" id="snapshotInvestValue" step="0.01" value="${autoInvestValue}">
+      </div>
+      <div class="field">
+        <label>分帳應收淨額(自動帶入，可覆寫；應付為負)</label>
+        <input type="number" id="snapshotReceivable" step="0.01" value="${autoReceivable}">
+      </div>
+      <div class="field">
+        <label>未繳帳單合計(自動帶入，可覆寫)</label>
+        <input type="number" id="snapshotUnpaidBills" step="0.01" value="${autoUnpaidBills}">
+      </div>
+      <div class="field">
+        <label>備註(選填)</label>
+        <input type="text" id="snapshotNote" placeholder="例如：這個月買了新手機">
+      </div>
+      <div class="budget-fixed-total">預覽淨資產:<span id="snapshotPreviewNetWorth">$0</span></div>
+      <button type="button" class="submit-btn" id="snapshotSubmitBtn">儲存本月快照</button>
+    `;
+
+    function renderAccountRows() {
+      const rowsWrap = el('snapshotAccountRows');
+      rowsWrap.innerHTML = accountList.map(acc => `
+        <div class="account-row" data-id="${acc.id}">
+          <input type="text" class="acc-name" value="${escapeHtml(acc.name)}" placeholder="帳戶名稱">
+          <input type="number" class="acc-balance" step="0.01" placeholder="${lastBalanceByName[acc.name] !== undefined ? lastBalanceByName[acc.name] : '餘額'}">
+          <button type="button" class="acc-del">✕</button>
+        </div>
+      `).join('');
+
+      rowsWrap.querySelectorAll('.acc-name').forEach(inp => {
+        inp.addEventListener('change', () => {
+          const row = inp.closest('.account-row');
+          const acc = accountList.find(a => a.id === row.dataset.id);
+          if (acc && inp.value.trim()) { acc.name = inp.value.trim(); saveAccountList(); }
+        });
+      });
+      rowsWrap.querySelectorAll('.acc-balance').forEach(inp => {
+        inp.addEventListener('input', updatePreview);
+      });
+      rowsWrap.querySelectorAll('.acc-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const row = btn.closest('.account-row');
+          if (!confirm('移除這個帳戶？(僅移除清單，不影響已儲存的歷史快照)')) return;
+          accountList = accountList.filter(a => a.id !== row.dataset.id);
+          saveAccountList();
+          renderAccountRows();
+          updatePreview();
+        });
+      });
+    }
+
+    function updatePreview() {
+      const cashTotal = computeCashTotalFromRows(el('snapshotAccountRows'));
+      el('snapshotCashTotal').textContent = formatMoney(cashTotal);
+      const investValue = parseFloat(el('snapshotInvestValue').value) || 0;
+      const receivable = parseFloat(el('snapshotReceivable').value) || 0;
+      const unpaidBills = parseFloat(el('snapshotUnpaidBills').value) || 0;
+      const netWorth = Math.round((cashTotal + investValue + receivable - unpaidBills) * 100) / 100;
+      el('snapshotPreviewNetWorth').textContent = formatMoney(netWorth);
+    }
+
+    renderAccountRows();
+    updatePreview();
+
+    el('addAccountRowBtn').addEventListener('click', () => {
+      accountList.push({ id: genId(), name: '' });
+      saveAccountList();
+      renderAccountRows();
+      updatePreview();
+      const rows = el('snapshotAccountRows').querySelectorAll('.acc-name');
+      if (rows.length) rows[rows.length - 1].focus();
+    });
+
+    el('snapshotInvestValue').addEventListener('input', updatePreview);
+    el('snapshotReceivable').addEventListener('input', updatePreview);
+    el('snapshotUnpaidBills').addEventListener('input', updatePreview);
+
+    el('snapshotSubmitBtn').addEventListener('click', () => {
+      const rows = Array.from(el('snapshotAccountRows').querySelectorAll('.account-row'));
+      const accounts = rows.map(row => {
+        const acc = accountList.find(a => a.id === row.dataset.id);
+        const balance = parseFloat(row.querySelector('.acc-balance').value);
+        return { name: acc ? acc.name : '', balance: isNaN(balance) ? 0 : balance };
+      }).filter(a => a.name);
+
+      if (accountList.length > 0 && accounts.length === 0) {
+        showToast('請至少填寫一個帳戶名稱');
+        return;
+      }
+
+      const cashTotal = Math.round(accounts.reduce((s, a) => s + a.balance, 0) * 100) / 100;
+      const investmentValue = parseFloat(el('snapshotInvestValue').value) || 0;
+      const receivable = parseFloat(el('snapshotReceivable').value) || 0;
+      const unpaidBills = parseFloat(el('snapshotUnpaidBills').value) || 0;
+      const netWorth = Math.round((cashTotal + investmentValue + receivable - unpaidBills) * 100) / 100;
+      const note = el('snapshotNote').value.trim();
+
+      saveNetWorthSnapshot({ accounts, cashTotal, investmentValue, receivable, unpaidBills, netWorth, note });
+      formWrap.style.display = 'none';
+    });
+  }
+
+  el('createSnapshotBtn').addEventListener('click', () => {
+    const formWrap = el('snapshotForm');
+    if (formWrap.style.display === 'block') {
+      formWrap.style.display = 'none';
+      return;
+    }
+    buildNetWorthSnapshotForm();
+    formWrap.style.display = 'block';
+  });
+
+  function renderNetWorthPage() {
+    const intro = el('networthIntroCard');
+    if (intro) intro.style.display = netWorthSnapshots.length === 0 ? 'block' : 'none';
+    renderNetWorthHero();
+    renderReconciliation();
+    renderNetWorthTrendChart();
+    renderNetWorthHistoryList();
+  }
 
   // ================= BUDGET (v2.9) =================
   const BUDGET_FIXED_COLOR = '#6B5B95'; // palette purple: fixed segment never carries a warning color
